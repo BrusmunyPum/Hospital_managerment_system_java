@@ -10,16 +10,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.time.format.DateTimeFormatter;
 
 public class PatientController {
 
     private RoomController roomCtrl = new RoomController();
     private DoctorController doctorCtrl = new DoctorController();
 
-    // ... (Keep existing methods: addPatient, removePatient, updatePatient, etc.) ...
-
+    // --- CRUD: ADD ---
     public boolean addPatient(Patient patient) {
+        // Updated to include admission_date
         String sql = "INSERT INTO patients (patient_id, name, age, address, medical_history, admission_date) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -28,7 +27,7 @@ public class PatientController {
             pstmt.setInt(3, patient.getAge());
             pstmt.setString(4, patient.getAddress());
             pstmt.setString(5, patient.getMedicalHistory());
-            pstmt.setDate(6, java.sql.Date.valueOf(patient.getAdmissionDate()));
+            pstmt.setDate(6, java.sql.Date.valueOf(patient.getAdmissionDate())); // Save Date
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -36,6 +35,7 @@ public class PatientController {
         }
     }
 
+    // --- CRUD: UPDATE ---
     public boolean updatePatient(Patient p) {
         String sql = "UPDATE patients SET name=?, age=?, address=?, medical_history=? WHERE patient_id=?";
         try (Connection conn = dbConnecting.getConnection();
@@ -52,6 +52,7 @@ public class PatientController {
         }
     }
     
+    // --- CRUD: UPDATE RELATIONS ---
     public void updatePatientRelationships(Patient p) {
         String sql = "UPDATE patients SET room_id = ?, doctor_id = ? WHERE patient_id = ?";
         try (Connection conn = dbConnecting.getConnection();
@@ -69,6 +70,7 @@ public class PatientController {
         }
     }
 
+    // --- CRUD: DELETE ---
     public boolean removePatient(String patientId) {
         String sql = "DELETE FROM patients WHERE patient_id = ?";
         try (Connection conn = dbConnecting.getConnection();
@@ -85,6 +87,7 @@ public class PatientController {
         return removePatient(patientId);
     }
     
+    // --- FIND SINGLE PATIENT ---
     public Patient findPatientById(String patientId) {
         String sql = "SELECT * FROM patients WHERE patient_id = ?";
         Patient p = null;
@@ -101,9 +104,11 @@ public class PatientController {
                     rs.getString("medical_history")
                 );
                 
+                // Load Date
                 java.sql.Date dbDate = rs.getDate("admission_date");
                 if (dbDate != null) p.setAdmissionDate(dbDate.toLocalDate());
 
+                // Load Relations
                 String roomId = rs.getString("room_id");
                 if (roomId != null) {
                     Room r = roomCtrl.findRoomById(roomId);
@@ -121,10 +126,9 @@ public class PatientController {
         return p;
     }
 
-    // --- OPTIMIZED: Fetch all data in ONE Query using JOINs ---
+    // --- OPTIMIZED: GET ALL (JOIN QUERY) ---
     public List<Patient> getAllPatients() {
         List<Patient> list = new ArrayList<>();
-        // Fetch Patient + Room Type + Doctor Name/Spec in one go
         String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
                      "FROM patients p " +
                      "LEFT JOIN rooms r ON p.room_id = r.room_id " +
@@ -133,37 +137,8 @@ public class PatientController {
         try (Connection conn = dbConnecting.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
-            
             while (rs.next()) {
-                // 1. Construct Patient
-                Patient p = new Patient(
-                    rs.getString("patient_id"),
-                    rs.getString("name"),
-                    rs.getInt("age"),
-                    rs.getString("address"),
-                    rs.getString("medical_history")
-                );
-                
-                java.sql.Date dbDate = rs.getDate("admission_date");
-                if (dbDate != null) p.setAdmissionDate(dbDate.toLocalDate());
-
-                // 2. Construct & Link Room (No extra DB calls!)
-                String roomId = rs.getString("room_id");
-                if (roomId != null) {
-                    Room r = new Room(roomId, rs.getString("room_type"));
-                    p.assignRoom(r);
-                    r.assignPatient(p); 
-                }
-
-                // 3. Construct & Link Doctor (No extra DB calls!)
-                String doctorId = rs.getString("doctor_id");
-                if (doctorId != null) {
-                    Doctor d = new Doctor(doctorId, rs.getString("doc_name"), rs.getString("specialization"));
-                    p.assignDoctor(d);
-                    d.assignPatient(p);
-                }
-
-                list.add(p);
+                list.add(extractPatientFromResultSet(rs));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -171,7 +146,29 @@ public class PatientController {
         return list;
     }
 
-    // --- OPTIMIZED: Search with JOINs ---
+    // --- NEW: FILTER BY DOCTOR (JOIN QUERY) ---
+    public List<Patient> getPatientsByDoctorId(String doctorId) {
+        List<Patient> list = new ArrayList<>();
+        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
+                     "FROM patients p " +
+                     "LEFT JOIN rooms r ON p.room_id = r.room_id " +
+                     "LEFT JOIN doctors d ON p.doctor_id = d.doctor_id " +
+                     "WHERE p.doctor_id = ?";
+
+        try (Connection conn = dbConnecting.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, doctorId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                list.add(extractPatientFromResultSet(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    // --- OPTIMIZED: SEARCH (JOIN QUERY) ---
     public List<Patient> searchPatients(String query) {
         List<Patient> list = new ArrayList<>();
         String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
@@ -182,40 +179,12 @@ public class PatientController {
                      
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
             String searchPattern = "%" + query + "%";
             pstmt.setString(1, searchPattern);
             pstmt.setString(2, searchPattern);
-            
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
-                // Same efficient construction as getAllPatients
-                Patient p = new Patient(
-                    rs.getString("patient_id"),
-                    rs.getString("name"),
-                    rs.getInt("age"),
-                    rs.getString("address"),
-                    rs.getString("medical_history")
-                );
-                
-                java.sql.Date dbDate = rs.getDate("admission_date");
-                if (dbDate != null) p.setAdmissionDate(dbDate.toLocalDate());
-
-                String roomId = rs.getString("room_id");
-                if (roomId != null) {
-                    Room r = new Room(roomId, rs.getString("room_type"));
-                    p.assignRoom(r);
-                    r.assignPatient(p); 
-                }
-
-                String doctorId = rs.getString("doctor_id");
-                if (doctorId != null) {
-                    Doctor d = new Doctor(doctorId, rs.getString("doc_name"), rs.getString("specialization"));
-                    p.assignDoctor(d);
-                    d.assignPatient(p);
-                }
-
-                list.add(p);
+                list.add(extractPatientFromResultSet(rs));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -223,6 +192,36 @@ public class PatientController {
         return list;
     }
     
+    // Helper to extract patient data from JOIN results
+    private Patient extractPatientFromResultSet(ResultSet rs) throws SQLException {
+        Patient p = new Patient(
+            rs.getString("patient_id"),
+            rs.getString("name"),
+            rs.getInt("age"),
+            rs.getString("address"),
+            rs.getString("medical_history")
+        );
+        
+        java.sql.Date dbDate = rs.getDate("admission_date");
+        if (dbDate != null) p.setAdmissionDate(dbDate.toLocalDate());
+
+        String roomId = rs.getString("room_id");
+        if (roomId != null) {
+            Room r = new Room(roomId, rs.getString("room_type"));
+            p.assignRoom(r);
+            r.assignPatient(p); 
+        }
+
+        String doctorId = rs.getString("doctor_id");
+        if (doctorId != null) {
+            Doctor d = new Doctor(doctorId, rs.getString("doc_name"), rs.getString("specialization"));
+            p.assignDoctor(d);
+            d.assignPatient(p);
+        }
+        return p;
+    }
+    
+    // --- DASHBOARD STATS ---
     public int getPatientCount() {
         String sql = "SELECT COUNT(*) FROM patients";
         try (Connection conn = dbConnecting.getConnection();
@@ -235,7 +234,7 @@ public class PatientController {
         return 0;
     }
 
-    // --- UPDATED BILLING METHOD ---
+    // --- BILLING GENERATOR ---
     public String generateBill(String patientId, LocalDate dischargeDate) {
         Patient p = findPatientById(patientId);
         if (p == null) return centerText("Error: Patient not found.");
@@ -244,16 +243,13 @@ public class PatientController {
             return centerText("Error: Patient is not assigned to a room.\nCannot calculate bill.");
         }
 
-        // 1. Get Admission Date
         LocalDate admissionDate = p.getAdmissionDate();
-        if (admissionDate == null) admissionDate = LocalDate.now(); // Fallback
+        if (admissionDate == null) admissionDate = LocalDate.now(); 
 
-        // 2. Calculate Days
         long days = ChronoUnit.DAYS.between(admissionDate, dischargeDate);
         if (days < 0) return centerText("Error: Discharge date cannot be before admission.");
-        if (days == 0) days = 1; // Minimum 1 day
+        if (days == 0) days = 1; 
 
-        // 3. Determine Rate
         double dailyRate = 0;
         String roomType = p.getRoom().getRoomType();
         if (roomType.equalsIgnoreCase("ICU")) dailyRate = 200.0;
@@ -262,7 +258,6 @@ public class PatientController {
 
         double totalBill = days * dailyRate;
 
-        // 4. Build Centered Invoice
         StringBuilder sb = new StringBuilder();
         sb.append(centerText("======================================")).append("\n");
         sb.append(centerText("       HOSPITAL INVOICE       ")).append("\n");
@@ -285,12 +280,10 @@ public class PatientController {
         return sb.toString();
     }
 
-    // Helper to center text manually for JTextArea
     private String centerText(String text) {
-        int width = 50; // Approximate width of the text area in characters
+        int width = 50; 
         int padding = (width - text.length()) / 2;
         if (padding <= 0) return text;
-        
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < padding; i++) sb.append(" ");
         sb.append(text);

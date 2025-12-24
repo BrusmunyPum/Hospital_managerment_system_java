@@ -1,9 +1,7 @@
 package panels;
 
 import controllers.HospitalManagementController;
-import models.Doctor;
-import models.Patient;
-import models.Room;
+import models.*;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -20,9 +18,17 @@ public class PatientPanel extends JPanel {
     private DefaultTableModel tableModel;
     private JTable table;
     private JTextField txtSearch;
+    
+    private User currentUser;       
+    private String doctorFilterId;  // Stores the ID of the doctor (if logged in as doctor)
 
-    public PatientPanel(HospitalManagementController hmc) {
+    // --- UPDATED CONSTRUCTOR ---
+    // Accepts HMC, User, and the doctorId to filter by (or null)
+    public PatientPanel(HospitalManagementController hmc, User user, String doctorId) {
         this.hmc = hmc;
+        this.currentUser = user;
+        this.doctorFilterId = doctorId; 
+        
         setLayout(new BorderLayout());
 
         // --- TOP (Search) ---
@@ -45,6 +51,7 @@ public class PatientPanel extends JPanel {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         add(new JScrollPane(table), BorderLayout.CENTER);
         
+        // --- MOUSE LISTENERS ---
         table.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -66,7 +73,8 @@ public class PatientPanel extends JPanel {
         JButton btnAssignDoc = new JButton("Assign Dr.");
         JButton btnAssignRoom = new JButton("Assign Room");
         JButton btnBill = new JButton("Generate Bill");
-        btnBill.setBackground(new Color(255, 204, 0)); // Gold color
+        btnBill.setBackground(new Color(255, 204, 0)); 
+        
         JButton btnDischarge = new JButton("Discharge");
         btnDischarge.setForeground(Color.RED);
 
@@ -78,6 +86,14 @@ public class PatientPanel extends JPanel {
         buttonPanel.add(btnBill); 
         buttonPanel.add(btnDischarge);
 
+        // --- PERMISSIONS LOGIC ---
+        // If Doctor, disable administrative buttons
+        if (currentUser.isDoctor()) {
+            btnAdd.setEnabled(false); 
+            btnAssignDoc.setEnabled(false); 
+            btnAssignRoom.setEnabled(false);
+        }
+
         add(buttonPanel, BorderLayout.SOUTH);
 
         // --- LISTENERS ---
@@ -85,60 +101,76 @@ public class PatientPanel extends JPanel {
         btnShowAll.addActionListener(e -> { txtSearch.setText(""); refreshTable(null); });
         txtSearch.addActionListener(e -> performSearch()); 
 
-        btnAdd.addActionListener(e -> showAddPatientDialog());
+        // Only add admin listeners if NOT a doctor
+        if (!currentUser.isDoctor()) {
+            btnAdd.addActionListener(e -> showAddPatientDialog());
+            btnAssignDoc.addActionListener(e -> {
+                String pid = getSelectedId(0);
+                if (pid != null) showAssignDoctorDialog(pid);
+            });
+            btnAssignRoom.addActionListener(e -> {
+                String pid = getSelectedId(0);
+                if (pid != null) showAssignRoomDialog(pid);
+            });
+        }
+        
         btnEdit.addActionListener(e -> showEditPatientDialog());
-        
-        btnAssignDoc.addActionListener(e -> {
-            String pid = getSelectedId(0);
-            if (pid != null) showAssignDoctorDialog(pid);
-        });
-
-        btnAssignRoom.addActionListener(e -> {
-            String pid = getSelectedId(0);
-            if (pid != null) showAssignRoomDialog(pid);
-        });
-        
         btnBill.addActionListener(e -> showBillDialog());
         btnDischarge.addActionListener(e -> performDischarge());
 
         refreshTable(null);
     }
     
-    // --- UPDATED: BILL DIALOG WITH DATE INPUT ---
-    private void showBillDialog() {
-        String patientId = getSelectedId(0);
-        if (patientId == null) return;
-        
-        // 1. Ask for Discharge Date
-        String inputDate = JOptionPane.showInputDialog(this, 
-            "Enter Discharge Date (YYYY-MM-DD):", 
-            LocalDate.now().toString()); // Default to today
-            
-        if (inputDate != null && !inputDate.trim().isEmpty()) {
-            try {
-                LocalDate dischargeDate = LocalDate.parse(inputDate);
-                
-                // 2. Generate Invoice with this date
-                String invoice = hmc.getPatientCtrl().generateBill(patientId, dischargeDate);
-                
-                // 3. Show Result
-                JTextArea textArea = new JTextArea(invoice);
-                textArea.setFont(new Font("Monospaced", Font.BOLD, 14)); // Monospace for alignment
-                textArea.setEditable(false);
-                JScrollPane scrollPane = new JScrollPane(textArea);
-                scrollPane.setPreferredSize(new Dimension(450, 400));
-                
-                JOptionPane.showMessageDialog(this, scrollPane, "Hospital Invoice", JOptionPane.INFORMATION_MESSAGE);
-                
-            } catch (DateTimeParseException e) {
-                JOptionPane.showMessageDialog(this, "Invalid Date Format. Please use YYYY-MM-DD.");
+    // --- UPDATED REFRESH LOGIC ---
+    public void refreshTable(List<Patient> data) {
+        tableModel.setRowCount(0);
+        List<Patient> patients;
+
+        if (data != null) {
+            patients = data; // Use search results
+        } else {
+            // IF DOCTOR: Show ONLY my patients
+            // We check if the user is a doctor AND we have a valid doctor ID filter
+            if (currentUser.isDoctor() && doctorFilterId != null) {
+                // Call the filtered method (Make sure this exists in PatientController!)
+                patients = hmc.getPatientCtrl().getPatientsByDoctorId(doctorFilterId);
+            } else {
+                // IF ADMIN/STAFF: Show Everyone
+                patients = hmc.getPatientCtrl().getAllPatients();
             }
+        }
+        
+        for (Patient p : patients) {
+            String docName = (p.getDoctor() != null) ? p.getDoctor().getName() : "None";
+            String roomName = (p.getRoom() != null) ? p.getRoom().getRoomId() : "None";
+            tableModel.addRow(new Object[]{
+                p.getPatientId(), p.getName(), p.getAge(), p.getAddress(), docName, roomName
+            });
         }
     }
 
-    // --- (Keeping your existing Helper Methods) ---
-    // Note: Copy these EXACTLY from your previous file
-    
+    private void performSearch() {
+        String query = txtSearch.getText().trim();
+        if (!query.isEmpty()) {
+            List<Patient> results = hmc.getPatientCtrl().searchPatients(query);
+            // If doctor, we might want to filter search results too, but simple search is fine for now
+            refreshTable(results);
+        } else {
+            refreshTable(null);
+        }
+    }
+
+    // --- Helper Methods ---
+
+    private String getSelectedId(int colIndex) {
+        int row = table.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a row first.");
+            return null;
+        }
+        return (String) table.getValueAt(row, colIndex);
+    }
+
     private void showContextMenu(MouseEvent e) {
         JPopupMenu menu = new JPopupMenu();
         JMenuItem billItem = new JMenuItem("Generate Bill"); 
@@ -152,17 +184,29 @@ public class PatientPanel extends JPanel {
         menu.add(billItem);
         menu.addSeparator();
         menu.add(editItem);
+        
+        // Only allow discharge if permitted (Admin/Staff/Doctor can all discharge usually)
         menu.add(deleteItem);
+        
         menu.show(e.getComponent(), e.getX(), e.getY());
     }
-    
-    private void performSearch() {
-        String query = txtSearch.getText().trim();
-        if (!query.isEmpty()) {
-            List<Patient> results = hmc.getPatientCtrl().searchPatients(query);
-            refreshTable(results);
-        } else {
-            refreshTable(null);
+
+    private void showBillDialog() {
+        String patientId = getSelectedId(0);
+        if (patientId == null) return;
+        
+        String inputDate = JOptionPane.showInputDialog(this, "Enter Discharge Date (YYYY-MM-DD):", LocalDate.now().toString());
+        if (inputDate != null && !inputDate.trim().isEmpty()) {
+            try {
+                LocalDate dischargeDate = LocalDate.parse(inputDate);
+                String invoice = hmc.getPatientCtrl().generateBill(patientId, dischargeDate);
+                JTextArea textArea = new JTextArea(invoice);
+                textArea.setFont(new Font("Monospaced", Font.BOLD, 14));
+                textArea.setEditable(false);
+                JOptionPane.showMessageDialog(this, new JScrollPane(textArea), "Hospital Invoice", JOptionPane.INFORMATION_MESSAGE);
+            } catch (DateTimeParseException e) {
+                JOptionPane.showMessageDialog(this, "Invalid Date Format.");
+            }
         }
     }
 
@@ -178,28 +222,6 @@ public class PatientPanel extends JPanel {
         }
     }
 
-    public void refreshTable(List<Patient> data) {
-        tableModel.setRowCount(0);
-        List<Patient> patients = (data == null) ? hmc.getPatientCtrl().getAllPatients() : data;
-        
-        for (Patient p : patients) {
-            String docName = (p.getDoctor() != null) ? p.getDoctor().getName() : "None";
-            String roomName = (p.getRoom() != null) ? p.getRoom().getRoomId() : "None";
-            tableModel.addRow(new Object[]{
-                p.getPatientId(), p.getName(), p.getAge(), p.getAddress(), docName, roomName
-            });
-        }
-    }
-
-    private String getSelectedId(int colIndex) {
-        int row = table.getSelectedRow();
-        if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Please select a row first.");
-            return null;
-        }
-        return (String) table.getValueAt(row, colIndex);
-    }
-
     private void showAddPatientDialog() {
         JTextField idField = new JTextField();
         JTextField nameField = new JTextField();
@@ -208,11 +230,17 @@ public class PatientPanel extends JPanel {
         JTextField historyField = new JTextField();
         Object[] message = { "ID:", idField, "Name:", nameField, "Age:", ageField, "Address:", addrField, "Medical History:", historyField };
         if (JOptionPane.showConfirmDialog(this, message, "Add Patient", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+            if (idField.getText().trim().isEmpty() || nameField.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "ID and Name required."); return;
+            }
             try {
-                Patient p = new Patient(idField.getText(), nameField.getText(), Integer.parseInt(ageField.getText()), addrField.getText(), historyField.getText());
-                if (hmc.getPatientCtrl().addPatient(p)) refreshTable(null);
-                else JOptionPane.showMessageDialog(this, "Failed. ID may exist.");
-            } catch (Exception ex) { JOptionPane.showMessageDialog(this, "Invalid Input"); }
+                int age = Integer.parseInt(ageField.getText().trim());
+                Patient p = new Patient(idField.getText(), nameField.getText(), age, addrField.getText(), historyField.getText());
+                if (hmc.getPatientCtrl().addPatient(p)) {
+                    refreshTable(null);
+                    JOptionPane.showMessageDialog(this, "Success!");
+                } else JOptionPane.showMessageDialog(this, "ID exists.");
+            } catch (Exception ex) { JOptionPane.showMessageDialog(this, "Invalid Age."); }
         }
     }
 
@@ -230,10 +258,8 @@ public class PatientPanel extends JPanel {
             try {
                 p.updateDetails(nameField.getText(), Integer.parseInt(ageField.getText()), addrField.getText(), historyField.getText());
                 if (hmc.getPatientCtrl().updatePatient(p)) {
-                    JOptionPane.showMessageDialog(this, "Updated!");
                     refreshTable(null);
-                } else {
-                    JOptionPane.showMessageDialog(this, "Update Failed.");
+                    JOptionPane.showMessageDialog(this, "Updated!");
                 }
             } catch (Exception ex) { JOptionPane.showMessageDialog(this, "Invalid Input"); }
         }

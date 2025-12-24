@@ -1,6 +1,6 @@
 package models;
 
-import java.time.LocalDate; 
+import java.time.LocalDate; // Import for Date handling
 
 public class Patient {
     private String patientId;
@@ -24,7 +24,6 @@ public class Patient {
         this.medicalHistory = medicalHistory;
         
         // NEW: Default to today's date when creating a new patient object
-        // This prevents "NullPointerException" when saving to the database
         this.admissionDate = LocalDate.now();
         
         this.room = null;
@@ -57,7 +56,6 @@ public class Patient {
     public Doctor getDoctor() { return doctor; }
     
     // NEW: Getter and Setter for Date
-    // Without these, the controller cannot access the date!
     public LocalDate getAdmissionDate() { return admissionDate; }
     public void setAdmissionDate(LocalDate admissionDate) { this.admissionDate = admissionDate; }
 
