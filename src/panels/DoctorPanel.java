@@ -4,11 +4,14 @@ import controllers.HospitalManagementController;
 import models.Doctor;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.File;
 import java.util.List;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 public class DoctorPanel extends JPanel {
 
@@ -35,12 +38,23 @@ public class DoctorPanel extends JPanel {
         add(topPanel, BorderLayout.NORTH);
 
         // --- TABLE ---
-        String[] columns = {"ID", "Name", "Specialization"};
+        // Changed "Image Path" to "Profile" and moved it to the first column for better visibility
+        String[] columns = {"Profile", "ID", "Name", "Specialization"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override public boolean isCellEditable(int row, int col) { return false; }
+            // Tell the table that the first column contains Icons/Images, not just Strings
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                return columnIndex == 0 ? ImageIcon.class : Object.class;
+            }
         };
         table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setRowHeight(60); // Increase row height to show image clearly
+        
+        // Assign the custom renderer to the "Profile" column (index 0)
+        table.getColumnModel().getColumn(0).setCellRenderer(new ImageRenderer());
+        
         add(new JScrollPane(table), BorderLayout.CENTER);
 
         // --- MOUSE LISTENERS ---
@@ -64,12 +78,12 @@ public class DoctorPanel extends JPanel {
         JPanel buttonPanel = new JPanel();
         JButton btnAdd = new JButton("Add");
         JButton btnEdit = new JButton("Edit");
-        JButton btnDelete = new JButton("Delete"); // NEW
+        JButton btnDelete = new JButton("Delete");
         btnDelete.setForeground(Color.RED);
         
         buttonPanel.add(btnAdd);
         buttonPanel.add(btnEdit);
-        buttonPanel.add(btnDelete); // NEW
+        buttonPanel.add(btnDelete);
         
         if (!isAdmin) {
             btnAdd.setEnabled(false);
@@ -87,19 +101,64 @@ public class DoctorPanel extends JPanel {
         if (isAdmin) {
             btnAdd.addActionListener(e -> showAddDoctorDialog());
             btnEdit.addActionListener(e -> showEditDoctorDialog());
-            btnDelete.addActionListener(e -> performDelete()); // NEW
+            btnDelete.addActionListener(e -> performDelete());
         }
 
         refreshTable(null);
     }
     
-    // --- NEW: Delete Logic ---
+    // --- Custom Image Renderer ---
+    // This class handles drawing the image in the table cell
+    class ImageRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            // Let default renderer handle background colors (selection, etc.)
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            
+            // Clear text (we only want the icon)
+            setText("");
+            setHorizontalAlignment(JLabel.CENTER);
+
+            // 'value' is the file path string we stored in the model
+            if (value != null) {
+                String path = (String) value;
+                if (!path.equals("No Image") && new File(path).exists()) {
+                    // Resize image to fit row height
+                    ImageIcon icon = new ImageIcon(path);
+                    Image img = icon.getImage().getScaledInstance(50, 50, Image.SCALE_SMOOTH);
+                    setIcon(new ImageIcon(img));
+                } else {
+                    setIcon(null); 
+                    setText("No Image");
+                }
+            } else {
+                setIcon(null);
+                setText("No Image");
+            }
+            return this;
+        }
+    }
+    
+    // --- Helper: Pick Image ---
+    private String pickImage() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select Profile Image");
+        fileChooser.setFileFilter(new FileNameExtensionFilter("Images", "jpg", "png", "jpeg"));
+        
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            return fileChooser.getSelectedFile().getAbsolutePath();
+        }
+        return null;
+    }
+
     private void performDelete() {
         int row = table.getSelectedRow();
         if (row == -1) { JOptionPane.showMessageDialog(this, "Select a doctor first."); return; }
         
-        String id = (String) table.getValueAt(row, 0);
-        String name = (String) table.getValueAt(row, 1);
+        // Note: Column indices changed because "Profile" is now index 0
+        String id = (String) table.getValueAt(row, 1); 
+        String name = (String) table.getValueAt(row, 2);
         
         int confirm = JOptionPane.showConfirmDialog(this, 
             "Delete Doctor " + name + "?\nWarning: Patients assigned to this doctor will be unassigned.",
@@ -118,7 +177,7 @@ public class DoctorPanel extends JPanel {
     private void showContextMenu(MouseEvent e) {
         JPopupMenu menu = new JPopupMenu();
         JMenuItem editItem = new JMenuItem("Edit Doctor");
-        JMenuItem deleteItem = new JMenuItem("Delete Doctor"); // NEW
+        JMenuItem deleteItem = new JMenuItem("Delete Doctor"); 
         
         editItem.addActionListener(ev -> showEditDoctorDialog());
         deleteItem.addActionListener(ev -> performDelete());
@@ -138,7 +197,12 @@ public class DoctorPanel extends JPanel {
         tableModel.setRowCount(0);
         List<Doctor> doctors = (data == null) ? hmc.getDoctorCtrl().getAllDoctors() : data;
         for (Doctor d : doctors) {
-            tableModel.addRow(new Object[]{d.getDoctorId(), d.getName(), d.getSpecialization()});
+            tableModel.addRow(new Object[]{
+                d.getImagePath(), // Column 0: Image Path (Renderer will turn this into an icon)
+                d.getDoctorId(),  // Column 1
+                d.getName(),      // Column 2
+                d.getSpecialization() // Column 3
+            });
         }
     }
 
@@ -146,10 +210,29 @@ public class DoctorPanel extends JPanel {
         JTextField idField = new JTextField();
         JTextField nameField = new JTextField();
         JTextField specField = new JTextField();
-        Object[] message = { "ID:", idField, "Name:", nameField, "Specialization:", specField };
+        
+        // Image Button
+        JButton btnImage = new JButton("Select Image");
+        final String[] selectedPath = {null}; // Wrapper for listener
+        
+        btnImage.addActionListener(e -> {
+            String path = pickImage();
+            if (path != null) {
+                selectedPath[0] = path;
+                btnImage.setText("Image Selected!");
+                btnImage.setBackground(Color.GREEN);
+            }
+        });
+
+        Object[] message = { 
+            "ID:", idField, 
+            "Name:", nameField, 
+            "Specialization:", specField,
+            "Profile Photo:", btnImage
+        };
 
         if (JOptionPane.showConfirmDialog(this, message, "Add Doctor", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            Doctor d = new Doctor(idField.getText(), nameField.getText(), specField.getText());
+            Doctor d = new Doctor(idField.getText(), nameField.getText(), specField.getText(), selectedPath[0]);
             if (hmc.getDoctorCtrl().addDoctor(d)) refreshTable(null);
             else JOptionPane.showMessageDialog(this, "Failed to add.");
         }
@@ -159,17 +242,36 @@ public class DoctorPanel extends JPanel {
         int row = table.getSelectedRow();
         if (row == -1) { JOptionPane.showMessageDialog(this, "Select a doctor first."); return; }
         
-        String id = (String) table.getValueAt(row, 0);
+        // Indices shifted by +1 because of Profile column at index 0
+        String id = (String) table.getValueAt(row, 1);
         Doctor d = hmc.getDoctorCtrl().findDoctorById(id);
         
         JTextField nameField = new JTextField(d.getName());
         JTextField specField = new JTextField(d.getSpecialization());
         
-        Object[] message = { "ID: " + id, "Name:", nameField, "Specialization:", specField };
+        JButton btnImage = new JButton(d.getImagePath() != null ? "Change Image" : "Select Image");
+        final String[] selectedPath = {d.getImagePath()}; 
+        
+        btnImage.addActionListener(e -> {
+            String path = pickImage();
+            if (path != null) {
+                selectedPath[0] = path;
+                btnImage.setText("Image Selected!");
+            }
+        });
+        
+        Object[] message = { 
+            "ID: " + id, 
+            "Name:", nameField, 
+            "Specialization:", specField,
+            "Profile Photo:", btnImage
+        };
         
         if (JOptionPane.showConfirmDialog(this, message, "Edit Doctor", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
             d.setName(nameField.getText());
             d.setSpecialization(specField.getText());
+            d.setImagePath(selectedPath[0]); // Update Image Path
+            
             if (hmc.getDoctorCtrl().updateDoctor(d)) {
                 refreshTable(null);
                 JOptionPane.showMessageDialog(this, "Updated!");

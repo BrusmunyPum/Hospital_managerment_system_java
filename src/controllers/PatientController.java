@@ -18,8 +18,8 @@ public class PatientController {
 
     // --- CRUD: ADD ---
     public boolean addPatient(Patient patient) {
-        // Updated to include admission_date
-        String sql = "INSERT INTO patients (patient_id, name, age, address, medical_history, admission_date) VALUES (?, ?, ?, ?, ?, ?)";
+        // Include image_path and admission_date
+        String sql = "INSERT INTO patients (patient_id, name, age, address, medical_history, admission_date, image_path) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, patient.getPatientId());
@@ -27,7 +27,8 @@ public class PatientController {
             pstmt.setInt(3, patient.getAge());
             pstmt.setString(4, patient.getAddress());
             pstmt.setString(5, patient.getMedicalHistory());
-            pstmt.setDate(6, java.sql.Date.valueOf(patient.getAdmissionDate())); // Save Date
+            pstmt.setDate(6, java.sql.Date.valueOf(patient.getAdmissionDate()));
+            pstmt.setString(7, patient.getImagePath()); // Save Image Path
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -37,14 +38,15 @@ public class PatientController {
 
     // --- CRUD: UPDATE ---
     public boolean updatePatient(Patient p) {
-        String sql = "UPDATE patients SET name=?, age=?, address=?, medical_history=? WHERE patient_id=?";
+        String sql = "UPDATE patients SET name=?, age=?, address=?, medical_history=?, image_path=? WHERE patient_id=?";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, p.getName());
             pstmt.setInt(2, p.getAge());
             pstmt.setString(3, p.getAddress());
             pstmt.setString(4, p.getMedicalHistory());
-            pstmt.setString(5, p.getPatientId());
+            pstmt.setString(5, p.getImagePath()); // Update Image Path
+            pstmt.setString(6, p.getPatientId());
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -101,14 +103,17 @@ public class PatientController {
                     rs.getString("name"),
                     rs.getInt("age"),
                     rs.getString("address"),
-                    rs.getString("medical_history")
+                    rs.getString("medical_history"),
+                    rs.getString("image_path") // Retrieve Image Path
                 );
                 
                 // Load Date
                 java.sql.Date dbDate = rs.getDate("admission_date");
                 if (dbDate != null) p.setAdmissionDate(dbDate.toLocalDate());
 
-                // Load Relations
+                // Load Relations (Note: In findById, we might still want distinct queries or a single joined query. 
+                // Keeping separate queries here ensures objects are fully populated if reusing standard logic, 
+                // but for pure optimization, a JOIN is better. For simplicity and consistency with your existing 'find' flow:)
                 String roomId = rs.getString("room_id");
                 if (roomId != null) {
                     Room r = roomCtrl.findRoomById(roomId);
@@ -129,7 +134,8 @@ public class PatientController {
     // --- OPTIMIZED: GET ALL (JOIN QUERY) ---
     public List<Patient> getAllPatients() {
         List<Patient> list = new ArrayList<>();
-        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
+        // Fetch Patient + Image + Room/Doc info
+        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization, d.image_path AS doc_image_path " +
                      "FROM patients p " +
                      "LEFT JOIN rooms r ON p.room_id = r.room_id " +
                      "LEFT JOIN doctors d ON p.doctor_id = d.doctor_id";
@@ -146,10 +152,10 @@ public class PatientController {
         return list;
     }
 
-    // --- NEW: FILTER BY DOCTOR (JOIN QUERY) ---
+    // --- FILTER BY DOCTOR (JOIN QUERY) ---
     public List<Patient> getPatientsByDoctorId(String doctorId) {
         List<Patient> list = new ArrayList<>();
-        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
+        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization, d.image_path AS doc_image_path " +
                      "FROM patients p " +
                      "LEFT JOIN rooms r ON p.room_id = r.room_id " +
                      "LEFT JOIN doctors d ON p.doctor_id = d.doctor_id " +
@@ -171,7 +177,7 @@ public class PatientController {
     // --- OPTIMIZED: SEARCH (JOIN QUERY) ---
     public List<Patient> searchPatients(String query) {
         List<Patient> list = new ArrayList<>();
-        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
+        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization, d.image_path AS doc_image_path " +
                      "FROM patients p " +
                      "LEFT JOIN rooms r ON p.room_id = r.room_id " +
                      "LEFT JOIN doctors d ON p.doctor_id = d.doctor_id " +
@@ -199,7 +205,8 @@ public class PatientController {
             rs.getString("name"),
             rs.getInt("age"),
             rs.getString("address"),
-            rs.getString("medical_history")
+            rs.getString("medical_history"),
+            rs.getString("image_path") // Retrieve Patient Image
         );
         
         java.sql.Date dbDate = rs.getDate("admission_date");
@@ -214,7 +221,12 @@ public class PatientController {
 
         String doctorId = rs.getString("doctor_id");
         if (doctorId != null) {
-            Doctor d = new Doctor(doctorId, rs.getString("doc_name"), rs.getString("specialization"));
+            // Be careful to use the alias for doctor image if you selected it
+            // Or just null if you don't need the doctor's image inside the patient object immediately
+            String docImg = null;
+            try { docImg = rs.getString("doc_image_path"); } catch (Exception e) {} 
+            
+            Doctor d = new Doctor(doctorId, rs.getString("doc_name"), rs.getString("specialization"), docImg);
             p.assignDoctor(d);
             d.assignPatient(p);
         }

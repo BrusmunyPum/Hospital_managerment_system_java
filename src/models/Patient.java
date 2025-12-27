@@ -1,6 +1,6 @@
 package models;
 
-import java.time.LocalDate; // Import for Date handling
+import java.time.LocalDate;
 
 public class Patient {
     private String patientId;
@@ -8,37 +8,33 @@ public class Patient {
     private int age;
     private String address;
     private String medicalHistory;
-    
-    // NEW FIELD: Stores when the patient was admitted
     private LocalDate admissionDate;
+    private String imagePath; // NEW
     
-    // References to other objects
     private Room room; 
     private Doctor doctor; 
 
-    public Patient(String patientId, String name, int age, String address, String medicalHistory) {
+    // Updated Constructor
+    public Patient(String patientId, String name, int age, String address, String medicalHistory, String imagePath) {
         this.patientId = patientId;
         this.name = name;
         this.age = age;
         this.address = address;
         this.medicalHistory = medicalHistory;
-        
-        // NEW: Default to today's date when creating a new patient object
+        this.imagePath = imagePath; // NEW
         this.admissionDate = LocalDate.now();
-        
         this.room = null;
         this.doctor = null;
     }
-
-    // --- Relationship Management ---
-    public void assignRoom(Room r) {
-        this.room = r;
+    
+    // Backwards compatibility constructor
+    public Patient(String patientId, String name, int age, String address, String medicalHistory) {
+        this(patientId, name, age, address, medicalHistory, null);
     }
 
-    public void assignDoctor(Doctor d) {
-        this.doctor = d;
-    }
-
+    // ... (Keep existing relationship methods and Getters) ...
+    public void assignRoom(Room r) { this.room = r; }
+    public void assignDoctor(Doctor d) { this.doctor = d; }
     public void updateDetails(String name, int age, String address, String medicalHistory) {
         this.name = name;
         this.age = age;
@@ -46,7 +42,7 @@ public class Patient {
         this.medicalHistory = medicalHistory;
     }
 
-    // --- Getters ---
+    // Getters
     public String getPatientId() { return patientId; }
     public String getName() { return name; }
     public int getAge() { return age; }
@@ -54,14 +50,13 @@ public class Patient {
     public String getMedicalHistory() { return medicalHistory; }
     public Room getRoom() { return room; }
     public Doctor getDoctor() { return doctor; }
-    
-    // NEW: Getter and Setter for Date
     public LocalDate getAdmissionDate() { return admissionDate; }
     public void setAdmissionDate(LocalDate admissionDate) { this.admissionDate = admissionDate; }
+    
+    // New Getter/Setter for Image
+    public String getImagePath() { return imagePath; }
+    public void setImagePath(String imagePath) { this.imagePath = imagePath; }
 
-    // --- Utility for UI ---
     @Override
-    public String toString() {
-        return name + " (ID: " + patientId + ")";
-    }
+    public String toString() { return name + " (ID: " + patientId + ")"; }
 }

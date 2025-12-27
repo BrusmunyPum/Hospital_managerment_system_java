@@ -1,13 +1,19 @@
 package panels;
 
 import controllers.HospitalManagementController;
-import models.*;
+import models.Doctor;
+import models.Patient;
+import models.Room;
+import models.User;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.File;
 import java.util.List;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -20,10 +26,8 @@ public class PatientPanel extends JPanel {
     private JTextField txtSearch;
     
     private User currentUser;       
-    private String doctorFilterId;  // Stores the ID of the doctor (if logged in as doctor)
+    private String doctorFilterId; 
 
-    // --- UPDATED CONSTRUCTOR ---
-    // Accepts HMC, User, and the doctorId to filter by (or null)
     public PatientPanel(HospitalManagementController hmc, User user, String doctorId) {
         this.hmc = hmc;
         this.currentUser = user;
@@ -43,12 +47,24 @@ public class PatientPanel extends JPanel {
         add(topPanel, BorderLayout.NORTH);
 
         // --- CENTER (Table) ---
-        String[] columns = {"ID", "Name", "Age", "Address", "Doctor", "Room"};
+        // Added "Profile" as the first column
+        String[] columns = {"Profile", "ID", "Name", "Age", "Address", "Doctor", "Room"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override public boolean isCellEditable(int row, int col) { return false; }
+            // Tell table that column 0 contains Images/Icons
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                return columnIndex == 0 ? ImageIcon.class : Object.class;
+            }
         };
+        
         table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setRowHeight(60); // Increase row height for images
+        
+        // Apply Custom Image Renderer to first column
+        table.getColumnModel().getColumn(0).setCellRenderer(new ImageRenderer());
+        
         add(new JScrollPane(table), BorderLayout.CENTER);
         
         // --- MOUSE LISTENERS ---
@@ -87,7 +103,6 @@ public class PatientPanel extends JPanel {
         buttonPanel.add(btnDischarge);
 
         // --- PERMISSIONS LOGIC ---
-        // If Doctor, disable administrative buttons
         if (currentUser.isDoctor()) {
             btnAdd.setEnabled(false); 
             btnAssignDoc.setEnabled(false); 
@@ -101,15 +116,14 @@ public class PatientPanel extends JPanel {
         btnShowAll.addActionListener(e -> { txtSearch.setText(""); refreshTable(null); });
         txtSearch.addActionListener(e -> performSearch()); 
 
-        // Only add admin listeners if NOT a doctor
         if (!currentUser.isDoctor()) {
             btnAdd.addActionListener(e -> showAddPatientDialog());
             btnAssignDoc.addActionListener(e -> {
-                String pid = getSelectedId(0);
+                String pid = getSelectedId(1); // ID is now at index 1
                 if (pid != null) showAssignDoctorDialog(pid);
             });
             btnAssignRoom.addActionListener(e -> {
-                String pid = getSelectedId(0);
+                String pid = getSelectedId(1); // ID is now at index 1
                 if (pid != null) showAssignRoomDialog(pid);
             });
         }
@@ -121,21 +135,51 @@ public class PatientPanel extends JPanel {
         refreshTable(null);
     }
     
-    // --- UPDATED REFRESH LOGIC ---
+    // --- Custom Image Renderer ---
+    class ImageRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            setText("");
+            setHorizontalAlignment(JLabel.CENTER);
+            if (value != null) {
+                String path = (String) value;
+                if (!path.equals("No Image") && new File(path).exists()) {
+                    ImageIcon icon = new ImageIcon(path);
+                    Image img = icon.getImage().getScaledInstance(50, 50, Image.SCALE_SMOOTH);
+                    setIcon(new ImageIcon(img));
+                } else {
+                    setIcon(null); setText("No Image");
+                }
+            } else {
+                setIcon(null); setText("No Image");
+            }
+            return this;
+        }
+    }
+
+    // --- Helper: Pick Image ---
+    private String pickImage() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select Profile Image");
+        fileChooser.setFileFilter(new FileNameExtensionFilter("Images", "jpg", "png", "jpeg"));
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            return fileChooser.getSelectedFile().getAbsolutePath();
+        }
+        return null;
+    }
+
     public void refreshTable(List<Patient> data) {
         tableModel.setRowCount(0);
         List<Patient> patients;
 
         if (data != null) {
-            patients = data; // Use search results
+            patients = data;
         } else {
-            // IF DOCTOR: Show ONLY my patients
-            // We check if the user is a doctor AND we have a valid doctor ID filter
             if (currentUser.isDoctor() && doctorFilterId != null) {
-                // Call the filtered method (Make sure this exists in PatientController!)
                 patients = hmc.getPatientCtrl().getPatientsByDoctorId(doctorFilterId);
             } else {
-                // IF ADMIN/STAFF: Show Everyone
                 patients = hmc.getPatientCtrl().getAllPatients();
             }
         }
@@ -144,7 +188,13 @@ public class PatientPanel extends JPanel {
             String docName = (p.getDoctor() != null) ? p.getDoctor().getName() : "None";
             String roomName = (p.getRoom() != null) ? p.getRoom().getRoomId() : "None";
             tableModel.addRow(new Object[]{
-                p.getPatientId(), p.getName(), p.getAge(), p.getAddress(), docName, roomName
+                p.getImagePath(), // Column 0: Image Path
+                p.getPatientId(), // Column 1: ID
+                p.getName(),
+                p.getAge(),
+                p.getAddress(),
+                docName, 
+                roomName
             });
         }
     }
@@ -153,21 +203,21 @@ public class PatientPanel extends JPanel {
         String query = txtSearch.getText().trim();
         if (!query.isEmpty()) {
             List<Patient> results = hmc.getPatientCtrl().searchPatients(query);
-            // If doctor, we might want to filter search results too, but simple search is fine for now
             refreshTable(results);
         } else {
             refreshTable(null);
         }
     }
 
-    // --- Helper Methods ---
-
+    // Note: ID column index is now 1 because of Profile Image at 0
     private String getSelectedId(int colIndex) {
         int row = table.getSelectedRow();
         if (row == -1) {
             JOptionPane.showMessageDialog(this, "Please select a row first.");
             return null;
         }
+        // If caller asks for 0 (old behavior), map to 1 (ID column)
+        if (colIndex == 0) colIndex = 1;
         return (String) table.getValueAt(row, colIndex);
     }
 
@@ -184,15 +234,12 @@ public class PatientPanel extends JPanel {
         menu.add(billItem);
         menu.addSeparator();
         menu.add(editItem);
-        
-        // Only allow discharge if permitted (Admin/Staff/Doctor can all discharge usually)
         menu.add(deleteItem);
-        
         menu.show(e.getComponent(), e.getX(), e.getY());
     }
 
     private void showBillDialog() {
-        String patientId = getSelectedId(0);
+        String patientId = getSelectedId(1);
         if (patientId == null) return;
         
         String inputDate = JOptionPane.showInputDialog(this, "Enter Discharge Date (YYYY-MM-DD):", LocalDate.now().toString());
@@ -211,7 +258,7 @@ public class PatientPanel extends JPanel {
     }
 
     private void performDischarge() {
-        String patientId = getSelectedId(0);
+        String patientId = getSelectedId(1);
         if (patientId != null) {
             if (JOptionPane.showConfirmDialog(this, "Discharge " + patientId + "?", "Confirm", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
                 if (hmc.dischargePatient(patientId)) {
@@ -228,14 +275,44 @@ public class PatientPanel extends JPanel {
         JTextField ageField = new JTextField();
         JTextField addrField = new JTextField();
         JTextField historyField = new JTextField();
-        Object[] message = { "ID:", idField, "Name:", nameField, "Age:", ageField, "Address:", addrField, "Medical History:", historyField };
-        if (JOptionPane.showConfirmDialog(this, message, "Add Patient", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            if (idField.getText().trim().isEmpty() || nameField.getText().trim().isEmpty()) {
-                JOptionPane.showMessageDialog(this, "ID and Name required."); return;
+        
+        // Image Button
+        JButton btnImage = new JButton("Select Image");
+        final String[] selectedPath = {null};
+        btnImage.addActionListener(e -> {
+            String path = pickImage();
+            if (path != null) {
+                selectedPath[0] = path;
+                btnImage.setText("Image Selected!");
+                btnImage.setBackground(Color.GREEN);
             }
+        });
+
+        Object[] message = { 
+            "ID:", idField, 
+            "Name:", nameField, 
+            "Age:", ageField, 
+            "Address:", addrField, 
+            "History:", historyField,
+            "Photo:", btnImage
+        };
+        
+        if (JOptionPane.showConfirmDialog(this, message, "Add Patient", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
             try {
+                if (idField.getText().trim().isEmpty() || nameField.getText().trim().isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "ID and Name required."); return;
+                }
                 int age = Integer.parseInt(ageField.getText().trim());
-                Patient p = new Patient(idField.getText(), nameField.getText(), age, addrField.getText(), historyField.getText());
+                // Use new constructor with image path
+                Patient p = new Patient(
+                    idField.getText().trim(), 
+                    nameField.getText().trim(), 
+                    age, 
+                    addrField.getText().trim(), 
+                    historyField.getText().trim(),
+                    selectedPath[0]
+                );
+                
                 if (hmc.getPatientCtrl().addPatient(p)) {
                     refreshTable(null);
                     JOptionPane.showMessageDialog(this, "Success!");
@@ -245,21 +322,45 @@ public class PatientPanel extends JPanel {
     }
 
     private void showEditPatientDialog() {
-        String id = getSelectedId(0);
+        String id = getSelectedId(1);
         if (id == null) return;
         Patient p = hmc.getPatientCtrl().findPatientById(id);
         if (p == null) return;
+        
         JTextField nameField = new JTextField(p.getName());
         JTextField ageField = new JTextField(String.valueOf(p.getAge()));
         JTextField addrField = new JTextField(p.getAddress());
         JTextField historyField = new JTextField(p.getMedicalHistory());
-        Object[] message = { "ID: " + id, "Name:", nameField, "Age:", ageField, "Address:", addrField, "History:", historyField };
+        
+        JButton btnImage = new JButton(p.getImagePath() != null ? "Change Image" : "Select Image");
+        final String[] selectedPath = {p.getImagePath()};
+        btnImage.addActionListener(e -> {
+            String path = pickImage();
+            if (path != null) {
+                selectedPath[0] = path;
+                btnImage.setText("Image Selected!");
+            }
+        });
+
+        Object[] message = { 
+            "ID: " + id, 
+            "Name:", nameField, 
+            "Age:", ageField, 
+            "Address:", addrField, 
+            "History:", historyField,
+            "Photo:", btnImage
+        };
+        
         if (JOptionPane.showConfirmDialog(this, message, "Edit Patient", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
             try {
                 p.updateDetails(nameField.getText(), Integer.parseInt(ageField.getText()), addrField.getText(), historyField.getText());
+                p.setImagePath(selectedPath[0]); // Update image path
+                
                 if (hmc.getPatientCtrl().updatePatient(p)) {
                     refreshTable(null);
                     JOptionPane.showMessageDialog(this, "Updated!");
+                } else {
+                    JOptionPane.showMessageDialog(this, "Update Failed.");
                 }
             } catch (Exception ex) { JOptionPane.showMessageDialog(this, "Invalid Input"); }
         }
