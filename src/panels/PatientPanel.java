@@ -15,6 +15,7 @@ import javax.swing.table.DefaultTableModel;
 import models.*;
 import utils.IconUtils;
 import utils.ModernUI;
+import utils.DialogUtils;
 
 public class PatientPanel extends JPanel {
 
@@ -426,11 +427,27 @@ public class PatientPanel extends JPanel {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
             JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            label.setIcon(new TextIcon(value.toString().substring(0, 1), new Color(200, 220, 255))); // Simple circle icon
-            label.setText(" " + value.toString());
-            // Center align the label content (icon + text)
-            label.setHorizontalAlignment(SwingConstants.CENTER); 
+            
+            String text = value.toString();
+            String nameForInitial = text.replaceAll("(?i)^Dr\\.\\s*", "").trim(); // Remove "Dr." prefix
+            String initial = nameForInitial.isEmpty() ? "?" : nameForInitial.substring(0, 1).toUpperCase();
+            
+            // Modern Colors
+            label.setIcon(new TextIcon(initial, new Color(225, 230, 255))); // Soft Blue
+            label.setText(" " + text);
+            label.setForeground(new Color(60, 60, 60)); // Darker gray text
+            
+            // Left align for cleaner lists
+            label.setHorizontalAlignment(SwingConstants.LEFT); 
             label.setHorizontalTextPosition(SwingConstants.RIGHT);
+            
+            // Add padding
+            label.setBorder(new EmptyBorder(0, 15, 0, 0));
+            
+            if (isSelected) {
+                 label.setForeground(table.getSelectionForeground());
+            }
+            
             return label;
         }
     }
@@ -793,8 +810,14 @@ public class PatientPanel extends JPanel {
         JTextField ageField = new JTextField();
         JTextField addrField = new JTextField();
         JTextField historyField = new JTextField();
-        Object[] message = { "ID:", idField, "Name:", nameField, "Age:", ageField, "Address:", addrField, "Medical History:", historyField };
-        if (JOptionPane.showConfirmDialog(this, message, "Add Patient", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+        JPanel panel = DialogUtils.createForm("Add New Patient",
+            "ID:", idField,
+            "Name:", nameField,
+            "Age:", ageField,
+            "Address:", addrField,
+            "Medical History:", historyField
+        );
+        if (JOptionPane.showConfirmDialog(this, panel, "Add Patient", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
             if (idField.getText().trim().isEmpty() || nameField.getText().trim().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "ID and Name required."); return;
             }
@@ -818,8 +841,15 @@ public class PatientPanel extends JPanel {
         JTextField ageField = new JTextField(String.valueOf(p.getAge()));
         JTextField addrField = new JTextField(p.getAddress());
         JTextField historyField = new JTextField(p.getMedicalHistory());
-        Object[] message = { "ID: " + id, "Name:", nameField, "Age:", ageField, "Address:", addrField, "History:", historyField };
-        if (JOptionPane.showConfirmDialog(this, message, "Edit Patient", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+        JPanel panel = DialogUtils.createForm("Edit Patient",
+            "Patient ID:", new JLabel(id),
+            "Name:", nameField,
+            "Age:", ageField,
+            "Address:", addrField,
+            "History:", historyField
+        );
+
+        if (JOptionPane.showConfirmDialog(this, panel, "Edit Patient", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
             try {
                 p.updateDetails(nameField.getText(), Integer.parseInt(ageField.getText()), addrField.getText(), historyField.getText());
                 if (hmc.getPatientCtrl().updatePatient(p)) {

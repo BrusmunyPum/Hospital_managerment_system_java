@@ -13,6 +13,7 @@ import javax.swing.table.DefaultTableModel;
 import models.*;
 import utils.IconUtils;
 import utils.ModernUI;
+import utils.DialogUtils;
 
 public class RoomPanel extends JPanel {
 
@@ -640,11 +641,10 @@ public class RoomPanel extends JPanel {
         String[] types = {"General", "ICU", "Private"};
         JComboBox<String> typeBox = new JComboBox<>(types);
         
-        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
-        panel.add(new JLabel("Room ID:"));
-        panel.add(idField);
-        panel.add(new JLabel("Room Type:"));
-        panel.add(typeBox);
+        JPanel panel = DialogUtils.createForm("Add New Room",
+            "Room ID:", idField,
+            "Room Type:", typeBox
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Add New Room", 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
@@ -676,11 +676,10 @@ public class RoomPanel extends JPanel {
         JComboBox<String> typeBox = new JComboBox<>(types);
         typeBox.setSelectedItem(room.getRoomType());
         
-        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
-        panel.add(new JLabel("Room ID:"));
-        panel.add(new JLabel(id));
-        panel.add(new JLabel("Room Type:"));
-        panel.add(typeBox);
+        JPanel panel = DialogUtils.createForm("Edit Room",
+            "Room ID:", new JLabel(id),
+            "Room Type:", typeBox
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Edit Room", 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {

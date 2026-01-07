@@ -5,6 +5,7 @@ import models.User;
 
 import utils.IconUtils;
 import utils.ModernUI;
+import utils.DialogUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -580,19 +581,14 @@ public class UserManagementPanel extends JPanel {
         
         JTextField linkField = new JTextField();
         
-        JPanel panel = new JPanel(new GridLayout(6, 2, 10, 10));
-        panel.add(new JLabel("Username:"));
-        panel.add(userField);
-        panel.add(new JLabel("Password:"));
-        panel.add(passField);
-        panel.add(new JLabel("Confirm Password:"));
-        panel.add(confirmPassField);
-        panel.add(new JLabel("Role:"));
-        panel.add(roleBox);
-        panel.add(new JLabel("Linked ID (Optional):"));
-        panel.add(linkField);
-        panel.add(new JLabel("(e.g., DOC-001 for Doctor)"));
-        panel.add(new JLabel(""));
+        JPanel panel = DialogUtils.createForm("Create New User",
+            "Username:", userField,
+            "Password:", passField,
+            "Confirm Password:", confirmPassField,
+            "Role:", roleBox,
+            "Linked ID (Optional):", linkField,
+            "", new JLabel("(e.g., DOC-001 for Doctor)")
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Create New User", 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
@@ -655,15 +651,12 @@ public class UserManagementPanel extends JPanel {
         
         JTextField linkField = new JTextField(user.getLinkedId() != null ? user.getLinkedId() : "");
         
-        JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
-        panel.add(new JLabel("Username (Cannot Change):"));
-        panel.add(userField);
-        panel.add(new JLabel("Role:"));
-        panel.add(roleBox);
-        panel.add(new JLabel("Linked ID:"));
-        panel.add(linkField);
-        panel.add(new JLabel("(Leave blank to unlink)"));
-        panel.add(new JLabel(""));
+        JPanel panel = DialogUtils.createForm("Edit User",
+            "Username (Cannot Change):", userField,
+            "Role:", roleBox,
+            "Linked ID:", linkField,
+            "", new JLabel("(Leave blank to unlink)")
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Edit User: " + username, 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
@@ -687,13 +680,11 @@ public class UserManagementPanel extends JPanel {
         JPasswordField newPassField = new JPasswordField();
         JPasswordField confirmPassField = new JPasswordField();
         
-        JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
-        panel.add(new JLabel("User:"));
-        panel.add(new JLabel(username));
-        panel.add(new JLabel("New Password:"));
-        panel.add(newPassField);
-        panel.add(new JLabel("Confirm Password:"));
-        panel.add(confirmPassField);
+        JPanel panel = DialogUtils.createForm("Reset Password",
+            "User:", new JLabel(username),
+            "New Password:", newPassField,
+            "Confirm Password:", confirmPassField
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Reset Password", 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {

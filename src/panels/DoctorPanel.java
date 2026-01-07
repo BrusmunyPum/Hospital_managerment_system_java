@@ -18,6 +18,7 @@ import models.*;
 
 import utils.IconUtils;
 import utils.ModernUI;
+import utils.DialogUtils;
 
 public class DoctorPanel extends JPanel {
 
@@ -580,13 +581,11 @@ public class DoctorPanel extends JPanel {
         JTextField nameField = new JTextField();
         JTextField specField = new JTextField();
         
-        JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
-        panel.add(new JLabel("Doctor ID:"));
-        panel.add(idField);
-        panel.add(new JLabel("Name:"));
-        panel.add(nameField);
-        panel.add(new JLabel("Specialization:"));
-        panel.add(specField);
+        JPanel panel = DialogUtils.createForm("Add New Doctor",
+            "Doctor ID:", idField,
+            "Name:", nameField,
+            "Specialization:", specField
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Add New Doctor", 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
@@ -618,13 +617,11 @@ public class DoctorPanel extends JPanel {
         JTextField nameField = new JTextField(d.getName());
         JTextField specField = new JTextField(d.getSpecialization());
         
-        JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
-        panel.add(new JLabel("Doctor ID:"));
-        panel.add(new JLabel(id));
-        panel.add(new JLabel("Name:"));
-        panel.add(nameField);
-        panel.add(new JLabel("Specialization:"));
-        panel.add(specField);
+        JPanel panel = DialogUtils.createForm("Edit Doctor",
+            "Doctor ID:", new JLabel(id),
+            "Name:", nameField,
+            "Specialization:", specField
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Edit Doctor", 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
