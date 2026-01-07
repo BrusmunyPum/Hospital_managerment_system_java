@@ -18,7 +18,6 @@ public class UserController {
             if (rs.next()) {
                 return new User(
                     rs.getString("username"),
-                    rs.getString("password"),
                     rs.getString("role"),
                     rs.getString("linked_id")
                 );
@@ -90,12 +89,28 @@ public class UserController {
             while (rs.next()) {
                 list.add(new User(
                     rs.getString("username"),
-                    "*****", // Hide password for security
                     rs.getString("role"),
                     rs.getString("linked_id")
                 ));
             }
         } catch (SQLException e) { e.printStackTrace(); }
         return list;
+    }
+
+    public User getUserByUsername(String username) {
+        String sql = "SELECT * FROM users WHERE username = ?";
+        try (Connection conn = dbConnecting.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return new User(
+                    rs.getString("username"),
+                    rs.getString("role"),
+                    rs.getString("linked_id")
+                );
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
     }
 }

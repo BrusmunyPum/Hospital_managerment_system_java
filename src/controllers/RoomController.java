@@ -67,7 +67,7 @@ public class RoomController {
     }
 
     public List<Room> searchRooms(String query) {
-        List<Room> rooms = new ArrayList<>();
+        java.util.Map<String, Room> roomMap = new java.util.LinkedHashMap<>();
         String sql = "SELECT r.*, p.patient_id, p.name AS patient_name " +
                      "FROM rooms r " +
                      "LEFT JOIN patients p ON r.room_id = p.room_id " +
@@ -81,18 +81,25 @@ public class RoomController {
             
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
-                Room r = new Room(rs.getString("room_id"), rs.getString("room_type"));
-                String pid = rs.getString("patient_id");
-                if (pid != null) {
-                    Patient p = new Patient(pid, rs.getString("patient_name"), 0, "", "");
-                    r.assignPatient(p);
+                String roomId = rs.getString("room_id");
+                Room r = roomMap.computeIfAbsent(roomId, k -> {
+                    try {
+                        return new Room(k, rs.getString("room_type"));
+                    } catch (SQLException e) { return null; }
+                });
+                
+                if (r != null) {
+                    String pid = rs.getString("patient_id");
+                    if (pid != null && r.getPatient() == null) {
+                        Patient p = new Patient(pid, rs.getString("patient_name"), 0, "", "");
+                        r.assignPatient(p);
+                    }
                 }
-                rooms.add(r);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return rooms;
+        return new ArrayList<>(roomMap.values());
     }
 
     public Room findRoomById(String roomId) {
@@ -120,7 +127,7 @@ public class RoomController {
     }
 
     public List<Room> getAllRooms() {
-        List<Room> rooms = new ArrayList<>();
+        java.util.Map<String, Room> roomMap = new java.util.LinkedHashMap<>();
         String sql = "SELECT r.*, p.patient_id, p.name AS patient_name " +
                      "FROM rooms r " +
                      "LEFT JOIN patients p ON r.room_id = p.room_id";
@@ -128,18 +135,27 @@ public class RoomController {
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                Room r = new Room(rs.getString("room_id"), rs.getString("room_type"));
-                String pid = rs.getString("patient_id");
-                if (pid != null) {
-                    Patient p = new Patient(pid, rs.getString("patient_name"), 0, "", "");
-                    r.assignPatient(p);
+                String roomId = rs.getString("room_id");
+                // Using computeIfAbsent to ensure unique Room objects
+                Room r = roomMap.computeIfAbsent(roomId, k -> {
+                    try {
+                        return new Room(k, rs.getString("room_type"));
+                    } catch (SQLException e) { return null; }
+                });
+
+                if (r != null) {
+                    String pid = rs.getString("patient_id");
+                    // Only assign if room is currently seen as empty (shows first patient)
+                    if (pid != null && r.getPatient() == null) {
+                        Patient p = new Patient(pid, rs.getString("patient_name"), 0, "", "");
+                        r.assignPatient(p);
+                    }
                 }
-                rooms.add(r);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return rooms;
+        return new ArrayList<>(roomMap.values());
     }
 
     public List<Room> getAvailableRooms() {

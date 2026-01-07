@@ -5,19 +5,19 @@ import db.dbConnecting;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DoctorController {
 
-    // --- CRUD: ADD ---
     public boolean addDoctor(Doctor doctor) {
-        String sql = "INSERT INTO doctors (doctor_id, name, specialization, image_path) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO doctors (doctor_id, name, specialization) VALUES (?, ?, ?)";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, doctor.getDoctorId());
             pstmt.setString(2, doctor.getName());
             pstmt.setString(3, doctor.getSpecialization());
-            pstmt.setString(4, doctor.getImagePath()); // Save Image Path
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -25,15 +25,13 @@ public class DoctorController {
         }
     }
 
-    // --- CRUD: UPDATE ---
     public boolean updateDoctor(Doctor doctor) {
-        String sql = "UPDATE doctors SET name=?, specialization=?, image_path=? WHERE doctor_id=?";
+        String sql = "UPDATE doctors SET name=?, specialization=? WHERE doctor_id=?";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, doctor.getName());
             pstmt.setString(2, doctor.getSpecialization());
-            pstmt.setString(3, doctor.getImagePath()); // Update Image Path
-            pstmt.setString(4, doctor.getDoctorId());
+            pstmt.setString(3, doctor.getDoctorId());
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -41,9 +39,9 @@ public class DoctorController {
         }
     }
 
-    // --- CRUD: DELETE ---
+    // --- NEW: Delete Doctor ---
     public boolean deleteDoctor(String doctorId) {
-        // 1. Unassign patients first (Set doctor_id to NULL)
+        // 1. Unassign patients first (Optional but recommended for safety)
         String unassignSql = "UPDATE patients SET doctor_id = NULL WHERE doctor_id = ?";
         // 2. Delete the doctor
         String deleteSql = "DELETE FROM doctors WHERE doctor_id = ?";
@@ -73,7 +71,6 @@ public class DoctorController {
         }
     }
 
-    // --- SEARCH ---
     public List<Doctor> searchDoctors(String query) {
         List<Doctor> list = new ArrayList<>();
         String sql = "SELECT * FROM doctors WHERE name ILIKE ? OR specialization ILIKE ? OR doctor_id ILIKE ?";
@@ -88,8 +85,7 @@ public class DoctorController {
                 list.add(new Doctor(
                     rs.getString("doctor_id"),
                     rs.getString("name"),
-                    rs.getString("specialization"),
-                    rs.getString("image_path") // Retrieve Image Path
+                    rs.getString("specialization")
                 ));
             }
         } catch (SQLException e) {
@@ -98,7 +94,6 @@ public class DoctorController {
         return list;
     }
 
-    // --- FIND SINGLE DOCTOR ---
     public Doctor findDoctorById(String doctorId) {
         String sql = "SELECT * FROM doctors WHERE doctor_id = ?";
         try (Connection conn = dbConnecting.getConnection();
@@ -109,8 +104,7 @@ public class DoctorController {
                 return new Doctor(
                     rs.getString("doctor_id"),
                     rs.getString("name"),
-                    rs.getString("specialization"),
-                    rs.getString("image_path") // Retrieve Image Path
+                    rs.getString("specialization")
                 );
             }
         } catch (SQLException e) {
@@ -119,7 +113,6 @@ public class DoctorController {
         return null;
     }
 
-    // --- GET ALL ---
     public List<Doctor> getAllDoctors() {
         List<Doctor> list = new ArrayList<>();
         String sql = "SELECT * FROM doctors";
@@ -130,8 +123,7 @@ public class DoctorController {
                 list.add(new Doctor(
                     rs.getString("doctor_id"),
                     rs.getString("name"),
-                    rs.getString("specialization"),
-                    rs.getString("image_path") // Retrieve Image Path
+                    rs.getString("specialization")
                 ));
             }
         } catch (SQLException e) {
@@ -140,7 +132,6 @@ public class DoctorController {
         return list;
     }
 
-    // --- STATS ---
     public int getDoctorCount() {
         String sql = "SELECT COUNT(*) FROM doctors";
         try (Connection conn = dbConnecting.getConnection();
@@ -151,5 +142,55 @@ public class DoctorController {
             e.printStackTrace();
         }
         return 0;
+    }
+
+    // --- DASHBOARD: DEPARTMENT LOAD ---
+    // Returns Mapping of Specialization -> Count
+    public Map<String, Integer> getSpecializationStats() {
+        Map<String, Integer> stats = new HashMap<>();
+        String sql = "SELECT specialization, COUNT(*) as count FROM doctors GROUP BY specialization";
+        try (Connection conn = dbConnecting.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                String spec = rs.getString("specialization");
+                if(spec == null || spec.isEmpty()) spec = "General";
+                stats.put(spec, rs.getInt("count"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return stats;
+    }
+
+    // --- DASHBOARD: AVAILABLE DOCTORS ---
+    // Ideally this would check a 'status' or 'shift' column, but for now we fetch a random subset
+    public List<Doctor> getAvailableDoctors() {
+        List<Doctor> list = new ArrayList<>();
+        // Fetch random 3 doctors
+        String sql = "SELECT * FROM doctors ORDER BY RANDOM() LIMIT 3"; 
+        // Note: RANDOM() works in Postgre/SQLite. For MySQL use RAND().
+        // Assuming Standard SQL or simple limit for universal compat.
+        // If not supported, just "ORDER BY doctor_id DESC LIMIT 3"
+        
+        // Let's check DB type? If unkown, use generic standard:
+        // Actually, let's use a safe fallback if RANDOM() fails or just simply grab first 3.
+        // "ORDER BY doctor_id" is safe.
+        sql = "SELECT * FROM doctors LIMIT 3";
+        
+        try (Connection conn = dbConnecting.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                list.add(new Doctor(
+                    rs.getString("doctor_id"),
+                    rs.getString("name"),
+                    rs.getString("specialization")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 }

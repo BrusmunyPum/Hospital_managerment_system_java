@@ -6,77 +6,38 @@ DROP TABLE IF EXISTS doctors CASCADE;
 DROP TABLE IF EXISTS rooms CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- =============================================
--- STEP 2: CREATE NEW TABLES
--- =============================================
-
--- 1. Users Table (For Login & Linking)
+-- Database Creation Script for Hospital Management System
+-- 1. Create Users Table
 CREATE TABLE users (
     username VARCHAR(50) PRIMARY KEY,
-    password VARCHAR(50) NOT NULL,
-    role VARCHAR(20) NOT NULL, -- 'ADMIN', 'STAFF', 'DOCTOR'
-    linked_id VARCHAR(50) -- Links to Doctor ID (e.g., 'DOC-001')
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    linked_id VARCHAR(50)
 );
-
--- 2. Rooms Table
-CREATE TABLE rooms (
-    room_id VARCHAR(50) PRIMARY KEY,
-    room_type VARCHAR(50) -- 'General', 'Private', 'ICU'
-);
-
--- 3. Doctors Table (With Image Path)
+-- 2. Create Doctors Table
 CREATE TABLE doctors (
     doctor_id VARCHAR(50) PRIMARY KEY,
-    name VARCHAR(100),
-    specialization VARCHAR(100),
-    image_path VARCHAR(255) -- New Column for Profile Image
+    name VARCHAR(100) NOT NULL,
+    specialization VARCHAR(100)
 );
-
--- 4. Patients Table (With Image Path & Admission Date)
+-- 3. Create Rooms Table
+CREATE TABLE rooms (
+    room_id VARCHAR(20) PRIMARY KEY,
+    room_type VARCHAR(50) NOT NULL
+);
+-- 4. Create Patients Table
 CREATE TABLE patients (
     patient_id VARCHAR(50) PRIMARY KEY,
-    name VARCHAR(100),
+    name VARCHAR(100) NOT NULL,
     age INT,
     address VARCHAR(255),
     medical_history TEXT,
-    admission_date DATE DEFAULT CURRENT_DATE, -- For Billing
-    image_path VARCHAR(255), -- New Column for Profile Image
-    room_id VARCHAR(50),
+    admission_date DATE,
+    room_id VARCHAR(20),
     doctor_id VARCHAR(50),
     FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE SET NULL,
     FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE SET NULL
 );
-
--- =============================================
--- STEP 3: INSERT DEFAULT DATA (Optional)
--- =============================================
-
--- Default Admin & Staff
-INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'ADMIN');
-INSERT INTO users (username, password, role) VALUES ('staff', 'staff123', 'STAFF');
-
--- Sample Rooms
-INSERT INTO rooms (room_id, room_type) VALUES ('101', 'General');
-INSERT INTO rooms (room_id, room_type) VALUES ('102', 'General');
-INSERT INTO rooms (room_id, room_type) VALUES ('VIP-01', 'Private');
-INSERT INTO rooms (room_id, room_type) VALUES ('ICU-A', 'ICU');
-
--- Sample Doctor
-INSERT INTO doctors (doctor_id, name, specialization, image_path) 
-VALUES ('DOC-001', 'Dr. Strange', 'Surgery', NULL);
-
--- Link Doctor to a User Login
+-- 5. Insert Default Admin User
 INSERT INTO users (username, password, role, linked_id) 
-VALUES ('dr_strange', 'magic', 'DOCTOR', 'DOC-001');
-
--- Sample Patient
-INSERT INTO patients (patient_id, name, age, address, medical_history, admission_date, room_id, doctor_id, image_path)
-VALUES ('P-001', 'Tony Stark', 45, 'Malibu', 'Heart Issue', CURRENT_DATE - 5, 'VIP-01', 'DOC-001', NULL);
-
--- =============================================
--- STEP 4: GRANT PERMISSIONS (Crucial for Java App)
--- =============================================
-GRANT ALL PRIVILEGES ON TABLE users TO postgres;
-GRANT ALL PRIVILEGES ON TABLE rooms TO postgres;
-GRANT ALL PRIVILEGES ON TABLE doctors TO postgres;
-GRANT ALL PRIVILEGES ON TABLE patients TO postgres;
+VALUES ('admin', 'admin123', 'ADMIN', NULL);

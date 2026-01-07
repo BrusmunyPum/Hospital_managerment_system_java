@@ -1,6 +1,6 @@
 package models;
 
-import java.time.LocalDate;
+import java.time.LocalDate; // Import for Date handling
 
 public class Patient {
     private String patientId;
@@ -8,33 +8,37 @@ public class Patient {
     private int age;
     private String address;
     private String medicalHistory;
-    private LocalDate admissionDate;
-    private String imagePath; // NEW
     
+    // NEW FIELD: Stores when the patient was admitted
+    private LocalDate admissionDate;
+    
+    // References to other objects
     private Room room; 
     private Doctor doctor; 
 
-    // Updated Constructor
-    public Patient(String patientId, String name, int age, String address, String medicalHistory, String imagePath) {
+    public Patient(String patientId, String name, int age, String address, String medicalHistory) {
         this.patientId = patientId;
         this.name = name;
         this.age = age;
         this.address = address;
         this.medicalHistory = medicalHistory;
-        this.imagePath = imagePath; // NEW
+        
+        // NEW: Default to today's date when creating a new patient object
         this.admissionDate = LocalDate.now();
+        
         this.room = null;
         this.doctor = null;
     }
-    
-    // Backwards compatibility constructor
-    public Patient(String patientId, String name, int age, String address, String medicalHistory) {
-        this(patientId, name, age, address, medicalHistory, null);
+
+    // --- Relationship Management ---
+    public void assignRoom(Room r) {
+        this.room = r;
     }
 
-    // ... (Keep existing relationship methods and Getters) ...
-    public void assignRoom(Room r) { this.room = r; }
-    public void assignDoctor(Doctor d) { this.doctor = d; }
+    public void assignDoctor(Doctor d) {
+        this.doctor = d;
+    }
+
     public void updateDetails(String name, int age, String address, String medicalHistory) {
         this.name = name;
         this.age = age;
@@ -42,7 +46,7 @@ public class Patient {
         this.medicalHistory = medicalHistory;
     }
 
-    // Getters
+    // --- Getters ---
     public String getPatientId() { return patientId; }
     public String getName() { return name; }
     public int getAge() { return age; }
@@ -50,13 +54,14 @@ public class Patient {
     public String getMedicalHistory() { return medicalHistory; }
     public Room getRoom() { return room; }
     public Doctor getDoctor() { return doctor; }
+    
+    // NEW: Getter and Setter for Date
     public LocalDate getAdmissionDate() { return admissionDate; }
     public void setAdmissionDate(LocalDate admissionDate) { this.admissionDate = admissionDate; }
-    
-    // New Getter/Setter for Image
-    public String getImagePath() { return imagePath; }
-    public void setImagePath(String imagePath) { this.imagePath = imagePath; }
 
+    // --- Utility for UI ---
     @Override
-    public String toString() { return name + " (ID: " + patientId + ")"; }
+    public String toString() {
+        return name + " (ID: " + patientId + ")";
+    }
 }

@@ -66,11 +66,8 @@ public class HospitalManagementController {
         Patient p = patientCtrl.findPatientById(patientId);
         
         if (p != null) {
-            // Just delete the patient row.
-            // The DB Foreign Keys are set to 'ON DELETE SET NULL' or handled by the deletion.
-            // But strict logic:
-            
-            return patientCtrl.removePatient(patientId);
+            // Delegate to PatientController which handles History logic
+            return patientCtrl.dischargePatient(patientId);
         }
         return false;
     }

@@ -7,7 +7,9 @@ import db.dbConnecting;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
@@ -17,9 +19,48 @@ public class PatientController {
     private DoctorController doctorCtrl = new DoctorController();
 
     // --- CRUD: ADD ---
+    public PatientController() {
+        createHistoryTable();
+    }
+
+    private void createHistoryTable() {
+        String sql = "CREATE TABLE IF NOT EXISTS patient_history (" +
+                     "history_id SERIAL PRIMARY KEY, " +
+                     "patient_id VARCHAR(50), " +
+                     "name VARCHAR(100), " +
+                     "age INTEGER, " +
+                     "address TEXT, " +
+                     "medical_history TEXT, " +
+                     "doctor_name VARCHAR(100), " +
+                     "admission_date VARCHAR(50), " +
+                     "discharge_date VARCHAR(50))";
+        try (Connection conn = dbConnecting.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // --- RESET DATABASE ---
+    public boolean resetDatabaseTables() {
+        String drop1 = "DROP TABLE IF EXISTS patient_history";
+        String drop2 = "DROP TABLE IF EXISTS patient_archives";
+        try (Connection conn = dbConnecting.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute(drop1);
+            stmt.execute(drop2);
+            createHistoryTable(); // Re-create fresh
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public boolean addPatient(Patient patient) {
-        // Include image_path and admission_date
-        String sql = "INSERT INTO patients (patient_id, name, age, address, medical_history, admission_date, image_path) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        // Updated to include admission_date
+        String sql = "INSERT INTO patients (patient_id, name, age, address, medical_history, admission_date) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, patient.getPatientId());
@@ -27,8 +68,7 @@ public class PatientController {
             pstmt.setInt(3, patient.getAge());
             pstmt.setString(4, patient.getAddress());
             pstmt.setString(5, patient.getMedicalHistory());
-            pstmt.setDate(6, java.sql.Date.valueOf(patient.getAdmissionDate()));
-            pstmt.setString(7, patient.getImagePath()); // Save Image Path
+            pstmt.setDate(6, java.sql.Date.valueOf(patient.getAdmissionDate())); // Save Date
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -38,15 +78,14 @@ public class PatientController {
 
     // --- CRUD: UPDATE ---
     public boolean updatePatient(Patient p) {
-        String sql = "UPDATE patients SET name=?, age=?, address=?, medical_history=?, image_path=? WHERE patient_id=?";
+        String sql = "UPDATE patients SET name=?, age=?, address=?, medical_history=? WHERE patient_id=?";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, p.getName());
             pstmt.setInt(2, p.getAge());
             pstmt.setString(3, p.getAddress());
             pstmt.setString(4, p.getMedicalHistory());
-            pstmt.setString(5, p.getImagePath()); // Update Image Path
-            pstmt.setString(6, p.getPatientId());
+            pstmt.setString(5, p.getPatientId());
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -86,7 +125,74 @@ public class PatientController {
     }
 
     public boolean dischargePatient(String patientId) {
+        // 1. Get info
+        Patient p = findPatientById(patientId);
+        if (p == null) return false;
+
+        // 2. SAVE TO HISTORY (Independent Step)
+        if (!saveToHistory(p)) {
+            System.err.println("Critical Error: Could not save patient to history. Aborting discharge.");
+            return false;
+        }
+
+        // 3. REMOVE PATIENT (Independent Step)
         return removePatient(patientId);
+    }
+
+    private boolean saveToHistory(Patient p) {
+        String docName = (p.getDoctor() != null) ? p.getDoctor().getName() : "Unassigned";
+        String admDate = (p.getAdmissionDate() != null) ? p.getAdmissionDate().toString() : LocalDate.now().toString();
+
+        String sql = "INSERT INTO patient_history (patient_id, name, age, address, medical_history, doctor_name, admission_date, discharge_date) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                     
+        try (Connection conn = dbConnecting.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setString(1, p.getPatientId());
+            pstmt.setString(2, p.getName());
+            pstmt.setInt(3, p.getAge());
+            pstmt.setString(4, p.getAddress());
+            pstmt.setString(5, p.getMedicalHistory());
+            pstmt.setString(6, docName);
+            pstmt.setString(7, admDate);
+            pstmt.setString(8, LocalDate.now().toString());
+            
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    // --- HISTORY METHODS ---
+    public List<models.PatientHistory> getPatientHistory() {
+        List<models.PatientHistory> list = new ArrayList<>();
+        String sql = "SELECT * FROM patient_history ORDER BY discharge_date DESC";
+        try (Connection conn = dbConnecting.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                try {
+                    list.add(new models.PatientHistory(
+                        rs.getString("patient_id"),
+                        rs.getString("name"),
+                        rs.getInt("age"),
+                        rs.getString("address"),
+                        rs.getString("medical_history"),
+                        rs.getString("doctor_name"),
+                        rs.getString("admission_date"),
+                        rs.getString("discharge_date")
+                    ));
+                } catch (Exception e) {
+                    // Prevent one bad record from breaking the whole list
+                    System.err.println("Skipping corrupted history record: " + e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
     }
     
     // --- FIND SINGLE PATIENT ---
@@ -103,17 +209,14 @@ public class PatientController {
                     rs.getString("name"),
                     rs.getInt("age"),
                     rs.getString("address"),
-                    rs.getString("medical_history"),
-                    rs.getString("image_path") // Retrieve Image Path
+                    rs.getString("medical_history")
                 );
                 
                 // Load Date
                 java.sql.Date dbDate = rs.getDate("admission_date");
                 if (dbDate != null) p.setAdmissionDate(dbDate.toLocalDate());
 
-                // Load Relations (Note: In findById, we might still want distinct queries or a single joined query. 
-                // Keeping separate queries here ensures objects are fully populated if reusing standard logic, 
-                // but for pure optimization, a JOIN is better. For simplicity and consistency with your existing 'find' flow:)
+                // Load Relations
                 String roomId = rs.getString("room_id");
                 if (roomId != null) {
                     Room r = roomCtrl.findRoomById(roomId);
@@ -134,8 +237,7 @@ public class PatientController {
     // --- OPTIMIZED: GET ALL (JOIN QUERY) ---
     public List<Patient> getAllPatients() {
         List<Patient> list = new ArrayList<>();
-        // Fetch Patient + Image + Room/Doc info
-        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization, d.image_path AS doc_image_path " +
+        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
                      "FROM patients p " +
                      "LEFT JOIN rooms r ON p.room_id = r.room_id " +
                      "LEFT JOIN doctors d ON p.doctor_id = d.doctor_id";
@@ -152,10 +254,10 @@ public class PatientController {
         return list;
     }
 
-    // --- FILTER BY DOCTOR (JOIN QUERY) ---
+    // --- NEW: FILTER BY DOCTOR (JOIN QUERY) ---
     public List<Patient> getPatientsByDoctorId(String doctorId) {
         List<Patient> list = new ArrayList<>();
-        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization, d.image_path AS doc_image_path " +
+        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
                      "FROM patients p " +
                      "LEFT JOIN rooms r ON p.room_id = r.room_id " +
                      "LEFT JOIN doctors d ON p.doctor_id = d.doctor_id " +
@@ -177,7 +279,7 @@ public class PatientController {
     // --- OPTIMIZED: SEARCH (JOIN QUERY) ---
     public List<Patient> searchPatients(String query) {
         List<Patient> list = new ArrayList<>();
-        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization, d.image_path AS doc_image_path " +
+        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
                      "FROM patients p " +
                      "LEFT JOIN rooms r ON p.room_id = r.room_id " +
                      "LEFT JOIN doctors d ON p.doctor_id = d.doctor_id " +
@@ -198,6 +300,24 @@ public class PatientController {
         return list;
     }
     
+    // --- NEW: GET PATIENT COUNTS GROUPED BY DOCTOR (BATCH QUERY) ---
+    public Map<String, Integer> getPatientCountsGroupedByDoctor() {
+        Map<String, Integer> counts = new HashMap<>();
+        String sql = "SELECT doctor_id, COUNT(*) as count FROM patients WHERE doctor_id IS NOT NULL GROUP BY doctor_id";
+        
+        try (Connection conn = dbConnecting.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+             
+            while (rs.next()) {
+                counts.put(rs.getString("doctor_id"), rs.getInt("count"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return counts;
+    }
+
     // Helper to extract patient data from JOIN results
     private Patient extractPatientFromResultSet(ResultSet rs) throws SQLException {
         Patient p = new Patient(
@@ -205,8 +325,7 @@ public class PatientController {
             rs.getString("name"),
             rs.getInt("age"),
             rs.getString("address"),
-            rs.getString("medical_history"),
-            rs.getString("image_path") // Retrieve Patient Image
+            rs.getString("medical_history")
         );
         
         java.sql.Date dbDate = rs.getDate("admission_date");
@@ -221,24 +340,82 @@ public class PatientController {
 
         String doctorId = rs.getString("doctor_id");
         if (doctorId != null) {
-            // Be careful to use the alias for doctor image if you selected it
-            // Or just null if you don't need the doctor's image inside the patient object immediately
-            String docImg = null;
-            try { docImg = rs.getString("doc_image_path"); } catch (Exception e) {} 
-            
-            Doctor d = new Doctor(doctorId, rs.getString("doc_name"), rs.getString("specialization"), docImg);
+            Doctor d = new Doctor(doctorId, rs.getString("doc_name"), rs.getString("specialization"));
             p.assignDoctor(d);
             d.assignPatient(p);
         }
         return p;
     }
     
+    // --- DASHBOARD: RECENT PATIENTS (JOIN QUERY) ---
+    public List<Patient> getRecentPatients(int limit) {
+        List<Patient> list = new ArrayList<>();
+        String sql = "SELECT p.*, r.room_type, d.name AS doc_name, d.specialization " +
+                     "FROM patients p " +
+                     "LEFT JOIN rooms r ON p.room_id = r.room_id " +
+                     "LEFT JOIN doctors d ON p.doctor_id = d.doctor_id " +
+                     "ORDER BY p.admission_date DESC LIMIT ?";
+
+        try (Connection conn = dbConnecting.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, limit);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                list.add(extractPatientFromResultSet(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
     // --- DASHBOARD STATS ---
     public int getPatientCount() {
         String sql = "SELECT COUNT(*) FROM patients";
         try (Connection conn = dbConnecting.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public int getCriticalPatientCount() {
+        // Count patients in ICU rooms
+        String sql = "SELECT COUNT(*) FROM patients p JOIN rooms r ON p.room_id = r.room_id WHERE r.room_type = 'ICU'";
+        try (Connection conn = dbConnecting.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public int getTodayDischargeCount() {
+        String today = LocalDate.now().toString();
+        String sql = "SELECT COUNT(*) FROM patient_history WHERE discharge_date = ?";
+        try (Connection conn = dbConnecting.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, today);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public int getTodayAdmissionCount() {
+        // Assuming 'admission_date' in 'patients' is stored as DATE type
+        String sql = "SELECT COUNT(*) FROM patients WHERE admission_date = ?";
+        try (Connection conn = dbConnecting.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setDate(1, java.sql.Date.valueOf(LocalDate.now()));
+            ResultSet rs = pstmt.executeQuery();
             if (rs.next()) return rs.getInt(1);
         } catch (SQLException e) {
             e.printStackTrace();
