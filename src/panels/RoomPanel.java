@@ -11,9 +11,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 import models.*;
-import utils.IconUtils;
-import utils.ModernUI;
-import utils.DialogUtils;
+import utils.*;
 
 public class RoomPanel extends JPanel {
 
@@ -702,47 +700,115 @@ public class RoomPanel extends JPanel {
         Room room = hmc.getRoomCtrl().findRoomById(id);
         if (room == null) return;
         
-        StringBuilder details = new StringBuilder();
-        details.append("═══════════════════════════════\n");
-        details.append("       ROOM DETAILS\n");
-        details.append("═══════════════════════════════\n\n");
-        details.append("Room ID: ").append(room.getRoomId()).append("\n");
-        details.append("Room Type: ").append(room.getRoomType()).append("\n");
-        details.append("Status: ").append(room.isOccupied() ? "Occupied" : "Available").append("\n");
-        details.append("Daily Rate: ").append(calculateRoomRate(room.getRoomType())).append("\n\n");
+        // === Main Card Panel ===
+        JPanel cardPanel = new JPanel(new BorderLayout());
+        cardPanel.setBackground(Color.WHITE);
+        cardPanel.setPreferredSize(new Dimension(450, 500));
+        cardPanel.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230), 1));
         
-        details.append("───────────────────────────────\n");
+        // 1. Header
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(new Color(13, 110, 253)); // Blue header
+        header.setBorder(new EmptyBorder(20, 25, 20, 25));
         
-        if (room.isOccupied() && room.getPatient() != null) {
+        JLabel lblTitle = new JLabel("Room Details");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        lblTitle.setForeground(Color.WHITE);
+        
+        JLabel lblSubtitle = new JLabel(room.getRoomType() + " Suite");
+        lblSubtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblSubtitle.setForeground(new Color(224, 247, 250));
+        
+        header.add(lblTitle, BorderLayout.NORTH);
+        header.add(lblSubtitle, BorderLayout.SOUTH);
+        cardPanel.add(header, BorderLayout.NORTH);
+        
+        // 2. Content
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(Color.WHITE);
+        content.setBorder(new EmptyBorder(20, 25, 20, 25));
+        
+        // Room Info
+        content.add(createSectionHeader("Room Information"));
+        content.add(createDetailRow("Room ID", room.getRoomId()));
+        content.add(createDetailRow("Type", room.getRoomType()));
+        content.add(createDetailRow("Rate", "$" +  String.format("%.2f", room.getPrice()) + " / night"));
+        
+        boolean occupied = room.isOccupied();
+        content.add(createStatusRow("Status", occupied ? "Occupied" : "Available", occupied ? new Color(220, 53, 69) : new Color(25, 135, 84)));
+
+        content.add(Box.createVerticalStrut(20));
+        
+        // Occupant Info
+        content.add(createSectionHeader(occupied ? "Current Occupant" : "Availability"));
+        
+        if (occupied && room.getPatient() != null) {
             Patient p = room.getPatient();
-            details.append("CURRENT OCCUPANT\n");
-            details.append("───────────────────────────────\n\n");
-            details.append("Patient ID: ").append(p.getPatientId()).append("\n");
-            details.append("Name: ").append(p.getName()).append("\n");
-            details.append("Age: ").append(p.getAge()).append("\n");
-            details.append("Diagnosis: ").append(p.getMedicalHistory()).append("\n");
+            content.add(createDetailRow("Patient ID", p.getPatientId()));
+            content.add(createDetailRow("Name", p.getName()));
+            content.add(createDetailRow("Admitted", p.getAdmissionDate() != null ? p.getAdmissionDate().toString() : "N/A"));
             
             if (p.getDoctor() != null) {
-                details.append("\nAssigned Doctor: Dr. ").append(p.getDoctor().getName()).append("\n");
-                details.append("Specialization: ").append(p.getDoctor().getSpecialization()).append("\n");
+                content.add(createDetailRow("Doctor", "Dr. " + p.getDoctor().getName()));
             }
         } else {
-            details.append("OCCUPANCY STATUS\n");
-            details.append("───────────────────────────────\n\n");
-            details.append("Room is currently available\n");
-            details.append("Ready for new patient admission\n");
+             JLabel lblFree = new JLabel("Room is clean and ready for admission.");
+             lblFree.setFont(new Font("Segoe UI", Font.ITALIC, 13));
+             lblFree.setForeground(Color.GRAY);
+             content.add(lblFree);
         }
+
+        JScrollPane scroll = new JScrollPane(content);
+        scroll.setBorder(null);
+        cardPanel.add(scroll, BorderLayout.CENTER);
         
-        JTextArea textArea = new JTextArea(details.toString());
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
-        textArea.setEditable(false);
-        textArea.setBackground(new Color(250, 250, 250));
-        textArea.setBorder(new EmptyBorder(10, 10, 10, 10));
+        // 3. Footer actions
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setBackground(new Color(245, 245, 245));
+        footer.setBorder(new EmptyBorder(10, 20, 10, 20));
+        JButton btnClose = new JButton("Close");
+        btnClose.addActionListener(e -> javax.swing.SwingUtilities.getWindowAncestor(btnClose).dispose());
+        footer.add(btnClose);
         
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(500, 400));
-        
-        JOptionPane.showMessageDialog(this, scrollPane, 
-            "Room " + id + " Details", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, cardPanel, "Room Details", JOptionPane.PLAIN_MESSAGE);
+    }
+    
+    // UI Helpers (Duplicated to be self-contained in this panel, or usually in ModernUI)
+    // To save space and time, I will duplicate for now as they are small helpers
+    
+    private JLabel createSectionHeader(String title) {
+        JLabel lbl = new JLabel(title);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lbl.setForeground(new Color(13, 110, 253));
+        lbl.setBorder(new EmptyBorder(0, 0, 10, 0));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return lbl;
+    }
+    
+    private JPanel createDetailRow(String label, String value) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 25)); // Width stretches, Height fixed
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel l = new JLabel(label + ": ");
+        l.setFont(new Font("Segoe UI", Font.BOLD, 13)); l.setForeground(Color.GRAY); l.setPreferredSize(new Dimension(100, 25));
+        JLabel v = new JLabel(value);
+        v.setFont(new Font("Segoe UI", Font.PLAIN, 13)); v.setForeground(new Color(50, 50, 50));
+        p.add(l, BorderLayout.WEST); p.add(v, BorderLayout.CENTER);
+        return p;
+    }
+    
+    private JPanel createStatusRow(String label, String status, Color color) {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 25));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel l = new JLabel(label + ": ");
+        l.setFont(new Font("Segoe UI", Font.BOLD, 13)); l.setForeground(Color.GRAY); l.setPreferredSize(new Dimension(100, 25));
+        JLabel v = new JLabel(status);
+        v.setFont(new Font("Segoe UI", Font.BOLD, 13)); v.setForeground(color);
+        p.add(l); p.add(v);
+        return p;
     }
 }

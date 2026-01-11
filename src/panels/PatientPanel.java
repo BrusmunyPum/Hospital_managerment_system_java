@@ -13,9 +13,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import models.*;
-import utils.IconUtils;
-import utils.ModernUI;
-import utils.DialogUtils;
+import utils.*;
 
 public class PatientPanel extends JPanel {
 
@@ -759,14 +757,17 @@ public class PatientPanel extends JPanel {
     
     private void showContextMenu(MouseEvent e) {
         JPopupMenu menu = new JPopupMenu();
+        JMenuItem viewItem = new JMenuItem("View Details");
         JMenuItem billItem = new JMenuItem("Generate Bill"); 
         JMenuItem editItem = new JMenuItem("Edit Patient");
         JMenuItem deleteItem = new JMenuItem("Discharge Patient");
 
+        viewItem.addActionListener(ev -> showPatientDetailsDialog());
         billItem.addActionListener(ev -> showBillDialog());
         editItem.addActionListener(ev -> showEditPatientDialog());
         deleteItem.addActionListener(ev -> performDischarge());
 
+        menu.add(viewItem);
         menu.add(billItem);
         menu.addSeparator();
         menu.add(editItem);
@@ -774,22 +775,279 @@ public class PatientPanel extends JPanel {
         menu.show(e.getComponent(), e.getX(), e.getY());
     }
 
+    private void showPatientDetailsDialog() {
+        String id = getSelectedIdFromRow();
+        if (id == null) return;
+        
+        Patient p = hmc.getPatientCtrl().findPatientById(id);
+        if (p == null) return;
+        
+        // === Main Card Panel ===
+        JPanel cardPanel = new JPanel(new BorderLayout());
+        cardPanel.setBackground(Color.WHITE);
+        cardPanel.setPreferredSize(new Dimension(450, 600)); // Taller for medical history
+        cardPanel.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230), 1));
+        
+        // 1. Header
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(new Color(13, 110, 253)); // Blue header
+        header.setBorder(new EmptyBorder(20, 25, 20, 25));
+        
+        JLabel lblTitle = new JLabel("Patient Profile");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        lblTitle.setForeground(Color.WHITE);
+        
+        JLabel lblSubtitle = new JLabel(p.getName());
+        lblSubtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblSubtitle.setForeground(new Color(224, 247, 250));
+        
+        header.add(lblTitle, BorderLayout.NORTH);
+        header.add(lblSubtitle, BorderLayout.SOUTH);
+        cardPanel.add(header, BorderLayout.NORTH);
+        
+        // 2. Content
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(Color.WHITE);
+        content.setBorder(new EmptyBorder(20, 25, 20, 25));
+        
+        // Personal Info
+        content.add(createSectionHeader("Personal Information"));
+        content.add(createDetailRow("ID", p.getPatientId()));
+        content.add(createDetailRow("Age", String.valueOf(p.getAge())));
+        content.add(createDetailRow("Address", p.getAddress()));
+        content.add(createDetailRow("Admission Date", p.getAdmissionDate() != null ? p.getAdmissionDate().toString() : "--"));
+        
+        content.add(Box.createVerticalStrut(20));
+        
+        // Medical Info
+        content.add(createSectionHeader("Medical Record"));
+        content.add(createDetailRow("Medical History", p.getMedicalHistory()));
+        
+        if (p.getDoctor() != null) {
+            content.add(createDetailRow("Assigned Doctor", "Dr. " + p.getDoctor().getName()));
+        } else {
+            content.add(createDetailRow("Assigned Doctor", "--"));
+        }
+        
+        if (p.getRoom() != null) {
+            content.add(createDetailRow("Room", p.getRoom().getRoomId() + " (" + p.getRoom().getRoomType() + ")"));
+        } else {
+             content.add(createDetailRow("Room", "--"));
+        }
+
+        JScrollPane scroll = new JScrollPane(content);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        cardPanel.add(scroll, BorderLayout.CENTER);
+        
+        // 3. Footer
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setBackground(new Color(245, 245, 245));
+        footer.setBorder(new EmptyBorder(10, 20, 10, 20));
+        JButton btnClose = new JButton("Close");
+        btnClose.addActionListener(e -> javax.swing.SwingUtilities.getWindowAncestor(btnClose).dispose());
+        footer.add(btnClose);
+        
+        JOptionPane.showMessageDialog(this, cardPanel, "Patient Details", JOptionPane.PLAIN_MESSAGE);
+    }
+    
+    // UI Helpers (Duplicated for containment)
+    // There are already duplicated helpers in this file (Invoice UI) but createDetailRow might be different. 
+    // I will add them or reuse if already present.
+    // Checking file... createInvoiceRow exists. I will add generic createDetailRow.
+    
+    // But wait, createInvoiceRow uses specific font sizes. I will add these specific helpers.
+    private JLabel createSectionHeader(String title) {
+        JLabel lbl = new JLabel(title);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lbl.setForeground(new Color(13, 110, 253));
+        lbl.setBorder(new EmptyBorder(0, 0, 10, 0));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return lbl;
+    }
+    
+    private JPanel createDetailRow(String label, String value) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 25));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel l = new JLabel(label + ": ");
+        l.setFont(new Font("Segoe UI", Font.BOLD, 13)); l.setForeground(Color.GRAY); l.setPreferredSize(new Dimension(130, 25)); // Slightly wider for "Medical Record" labels
+        JLabel v = new JLabel(value);
+        v.setFont(new Font("Segoe UI", Font.PLAIN, 13)); v.setForeground(new Color(50, 50, 50));
+        p.add(l, BorderLayout.WEST); p.add(v, BorderLayout.CENTER);
+        return p;
+    }
+
     private void showBillDialog() {
         String patientId = getSelectedIdFromRow();
         if (patientId == null) return;
         
-        String inputDate = JOptionPane.showInputDialog(this, "Enter Discharge Date (YYYY-MM-DD):", LocalDate.now().toString());
-        if (inputDate != null && !inputDate.trim().isEmpty()) {
-            try {
-                LocalDate dischargeDate = LocalDate.parse(inputDate);
-                String invoice = hmc.getPatientCtrl().generateBill(patientId, dischargeDate);
-                JTextArea textArea = new JTextArea(invoice);
-                textArea.setFont(new Font("Monospaced", Font.BOLD, 14));
-                JOptionPane.showMessageDialog(this, new JScrollPane(textArea), "Hospital Invoice", JOptionPane.INFORMATION_MESSAGE);
-            } catch (DateTimeParseException e) {
-                JOptionPane.showMessageDialog(this, "Invalid Date Format.");
+        Patient p = hmc.getPatientCtrl().findPatientById(patientId);
+        if (p == null) return;
+
+        // Ask for Date
+        JTextField txtDate = new JTextField(LocalDate.now().toString());
+        JPanel datePanel = new JPanel(new BorderLayout(10, 10));
+        datePanel.add(new JLabel("Discharge Date (YYYY-MM-DD):"), BorderLayout.NORTH);
+        datePanel.add(txtDate, BorderLayout.CENTER);
+        datePanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        int result = JOptionPane.showConfirmDialog(this, datePanel, "Generate Bill", JOptionPane.OK_CANCEL_OPTION);
+        if (result != JOptionPane.OK_OPTION) return;
+
+        try {
+            LocalDate dischargeDate = LocalDate.parse(txtDate.getText().trim());
+            
+            // Calculate Bill Data
+            long days = 0;
+            if (p.getAdmissionDate() != null) {
+                days = java.time.temporal.ChronoUnit.DAYS.between(p.getAdmissionDate(), dischargeDate);
+                if (days < 1) days = 1; // Minimum 1 day charge
             }
+            
+            double roomRate = 0.0;
+            String roomType = "No Room Assigned";
+            if (p.getRoom() != null) {
+                roomType = p.getRoom().getRoomType();
+                roomRate = p.getRoom().getPrice();
+                if (roomRate == 0) roomRate = 100.0; // Fallback default
+            }
+            double total = days * roomRate;
+            // double doctorFee = hmc.getDoctorCtrl().ConsultationFee(); // Future expansion
+
+            // === BUILD INVOICE UI ===
+            JPanel invoicePanel = new JPanel(new BorderLayout(0, 0));
+            invoicePanel.setBackground(Color.WHITE);
+            invoicePanel.setPreferredSize(new Dimension(450, 600));
+            invoicePanel.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230), 1)); // Outer Frame
+
+            // 1. Header
+            JPanel header = new JPanel(new BorderLayout());
+            header.setBackground(new Color(245, 247, 250)); // Light Gray Header
+            header.setBorder(new EmptyBorder(25, 30, 25, 30));
+            
+            JLabel lblTitle = new JLabel("INVOICE");
+            lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
+            lblTitle.setForeground(new Color(50, 50, 50));
+            
+            JLabel lblDate = new JLabel("Date: " + LocalDate.now());
+            lblDate.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            lblDate.setForeground(Color.GRAY);
+            
+            header.add(lblTitle, BorderLayout.WEST);
+            header.add(lblDate, BorderLayout.EAST);
+            invoicePanel.add(header, BorderLayout.NORTH);
+
+            // 2. Content
+            JPanel content = new JPanel();
+            content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+            content.setBackground(Color.WHITE);
+            content.setBorder(new EmptyBorder(30, 30, 30, 30));
+
+            // Section: Patient Details
+            content.add(createInvoiceRow("Billed To:", p.getName()));
+            content.add(Box.createVerticalStrut(5));
+            content.add(createInvoiceRow("Patient ID:", p.getPatientId()));
+            content.add(Box.createVerticalStrut(5));
+            content.add(createInvoiceRow("Address:", p.getAddress()));
+            
+            content.add(Box.createVerticalStrut(30));
+            JSeparator sep1 = new JSeparator(); sep1.setForeground(new Color(230, 230, 230));
+            content.add(sep1);
+            content.add(Box.createVerticalStrut(15));
+
+            // Section: Charges Table (Grid)
+            JPanel tableHeader = new JPanel(new BorderLayout());
+            tableHeader.setBackground(Color.WHITE);
+            JLabel th1 = new JLabel("Description"); th1.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            JLabel th2 = new JLabel("Amount"); th2.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            tableHeader.add(th1, BorderLayout.WEST);
+            tableHeader.add(th2, BorderLayout.EAST);
+            content.add(tableHeader);
+            content.add(Box.createVerticalStrut(10));
+            
+            // Item 1: Room Charges
+            content.add(createInvoiceItem("Room Charges (" + roomType + ")", 
+                days + " days @ $" + String.format("%.2f", roomRate), 
+                days * roomRate));
+            
+            // Item 2: Doctor Fees (Fixed for now as example)
+            content.add(Box.createVerticalStrut(10));
+            content.add(createInvoiceItem("Medical Services", "Consultation & Care", 150.00));
+            total += 150.00;
+
+            content.add(Box.createVerticalStrut(30));
+            JSeparator sep2 = new JSeparator(); sep2.setForeground(new Color(230, 230, 230));
+            content.add(sep2);
+            content.add(Box.createVerticalStrut(15));
+            
+            // Section: Total
+            JPanel totalPanel = new JPanel(new BorderLayout());
+            totalPanel.setBackground(Color.WHITE);
+            JLabel lblTotalText = new JLabel("TOTAL DUE");
+            lblTotalText.setFont(new Font("Segoe UI", Font.BOLD, 14));
+            lblTotalText.setForeground(Color.GRAY);
+            
+            JLabel lblTotalVal = new JLabel("$" + String.format("%,.2f", total));
+            lblTotalVal.setFont(new Font("Segoe UI", Font.BOLD, 28));
+            lblTotalVal.setForeground(new Color(13, 110, 253)); // Primary Blue
+            
+            totalPanel.add(lblTotalText, BorderLayout.WEST);
+            totalPanel.add(lblTotalVal, BorderLayout.EAST);
+            content.add(totalPanel);
+            
+            invoicePanel.add(content, BorderLayout.CENTER);
+
+            // 3. Footer
+            JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
+            footer.setBackground(Color.WHITE);
+            footer.setBorder(new EmptyBorder(0, 0, 20, 0));
+            JLabel lblFooter = new JLabel("Thank you for choosing our hospital service.");
+            lblFooter.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+            lblFooter.setForeground(Color.LIGHT_GRAY);
+            footer.add(lblFooter);
+            invoicePanel.add(footer, BorderLayout.SOUTH);
+
+            // Show Dialog
+            JOptionPane.showMessageDialog(this, invoicePanel, "Invoice Generated", JOptionPane.PLAIN_MESSAGE);
+
+        } catch (DateTimeParseException e) {
+            JOptionPane.showMessageDialog(this, "Invalid Date Format.");
         }
+    }
+
+    // Helper for Invoice Labels
+    private JPanel createInvoiceRow(String label, String value) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 20));
+        JLabel l = new JLabel(label); l.setFont(new Font("Segoe UI", Font.BOLD, 12)); l.setForeground(Color.GRAY);
+        JLabel v = new JLabel(value); v.setFont(new Font("Segoe UI", Font.PLAIN, 13)); v.setForeground(Color.DARK_GRAY);
+        p.add(l, BorderLayout.WEST);
+        p.add(v, BorderLayout.EAST);
+        return p;
+    }
+
+    // Helper for Invoice Items
+    private JPanel createInvoiceItem(String title, String subtitle, double amount) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 40));
+        
+        JPanel left = new JPanel(new GridLayout(2, 1));
+        left.setBackground(Color.WHITE);
+        JLabel l1 = new JLabel(title); l1.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        JLabel l2 = new JLabel(subtitle); l2.setFont(new Font("Segoe UI", Font.PLAIN, 11)); l2.setForeground(Color.GRAY);
+        left.add(l1); left.add(l2);
+        
+        JLabel v = new JLabel("$" + String.format("%,.2f", amount));
+        v.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        
+        p.add(left, BorderLayout.WEST);
+        p.add(v, BorderLayout.EAST);
+        return p;
     }
 
     private void performDischarge() {

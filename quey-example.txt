@@ -6,7 +6,6 @@ DROP TABLE IF EXISTS doctors CASCADE;
 DROP TABLE IF EXISTS rooms CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- Database Creation Script for Hospital Management System
 -- 1. Create Users Table
 CREATE TABLE users (
     username VARCHAR(50) PRIMARY KEY,
@@ -23,7 +22,8 @@ CREATE TABLE doctors (
 -- 3. Create Rooms Table
 CREATE TABLE rooms (
     room_id VARCHAR(20) PRIMARY KEY,
-    room_type VARCHAR(50) NOT NULL
+    room_type VARCHAR(50) NOT NULL,
+    price DECIMAL(10, 2) DEFAULT 100.00
 );
 -- 4. Create Patients Table
 CREATE TABLE patients (
@@ -41,3 +41,4 @@ CREATE TABLE patients (
 -- 5. Insert Default Admin User
 INSERT INTO users (username, password, role, linked_id) 
 VALUES ('admin', 'admin123', 'ADMIN', NULL);
+

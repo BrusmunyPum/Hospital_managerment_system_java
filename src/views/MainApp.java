@@ -7,7 +7,7 @@ import java.awt.Color;
 public class MainApp {
     public static void main(String[] args) {
         try {
-            // // use the built-in "Nimbus" which is better than default
+            // use the built-in "Nimbus" which is better than default
             UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
             
             // Customize Nimbus to be flatter and whiter
@@ -34,3 +34,4 @@ public class MainApp {
         });
     }
 }
+

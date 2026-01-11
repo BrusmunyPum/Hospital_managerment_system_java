@@ -49,14 +49,19 @@ public class LoginView extends JFrame {
         leftTextPanel.setLayout(new BoxLayout(leftTextPanel, BoxLayout.Y_AXIS));
         leftTextPanel.setBounds(100, 40, 500, 300); 
 
-        JLabel titleLabel = new JLabel("<html>"
-                + "<div style='text-align: left;'>"
-                + "<span style='font-size: 16px; color: #E0F7FA;'>Welcome To Our</span><br/><br/>"
-                + "<span style='font-size: 30px; font-weight: bold; color: white;'>Hospital Management System</span>"
-                + "</div>"
-                + "</html>");
-        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        leftTextPanel.add(titleLabel);
+        JLabel lblWelcomeTitle = new JLabel("Welcome To Our");
+        lblWelcomeTitle.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+        lblWelcomeTitle.setForeground(new Color(224, 247, 250)); 
+        lblWelcomeTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        JLabel lblMainTitle = new JLabel("Hospital Management System");
+        lblMainTitle.setFont(new Font("Segoe UI", Font.BOLD, 32));
+        lblMainTitle.setForeground(Color.WHITE);
+        lblMainTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        leftTextPanel.add(lblWelcomeTitle);
+        leftTextPanel.add(Box.createVerticalStrut(10)); // Top padding
+        leftTextPanel.add(lblMainTitle);
         layeredPane.add(leftTextPanel, JLayeredPane.PALETTE_LAYER);
 
         // ================= RIGHT PANEL (Rounded Glass Card) =================

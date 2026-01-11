@@ -647,41 +647,111 @@ public class DoctorPanel extends JPanel {
         
         List<Patient> patients = hmc.getPatientCtrl().getPatientsByDoctorId(id);
         
-        StringBuilder details = new StringBuilder();
-        details.append("═══════════════════════════════\n");
-        details.append("       DOCTOR DETAILS\n");
-        details.append("═══════════════════════════════\n\n");
-        details.append("ID: ").append(d.getDoctorId()).append("\n");
-        details.append("Name: Dr. ").append(d.getName()).append("\n");
-        details.append("Specialization: ").append(d.getSpecialization()).append("\n\n");
-        details.append("───────────────────────────────\n");
-        details.append("ASSIGNED PATIENTS: ").append(patients.size()).append("\n");
-        details.append("───────────────────────────────\n\n");
+        // === Main Card Panel ===
+        JPanel cardPanel = new JPanel(new BorderLayout());
+        cardPanel.setBackground(Color.WHITE);
+        cardPanel.setPreferredSize(new Dimension(450, 500));
+        cardPanel.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230), 1));
         
+        // 1. Header
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(new Color(13, 110, 253)); // Blue header
+        header.setBorder(new EmptyBorder(20, 25, 20, 25));
+        
+        JLabel lblTitle = new JLabel("Dr. " + d.getName());
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        lblTitle.setForeground(Color.WHITE);
+        
+        JLabel lblSubtitle = new JLabel(d.getSpecialization());
+        lblSubtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblSubtitle.setForeground(new Color(224, 247, 250));
+        
+        header.add(lblTitle, BorderLayout.NORTH);
+        header.add(lblSubtitle, BorderLayout.SOUTH);
+        cardPanel.add(header, BorderLayout.NORTH);
+        
+        // 2. Content
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(Color.WHITE);
+        content.setBorder(new EmptyBorder(20, 25, 20, 25));
+        
+        // Doctor Info
+        content.add(createSectionHeader("Profile"));
+        content.add(createDetailRow("Doctor ID", d.getDoctorId()));
+        content.add(createDetailRow("Specialization", d.getSpecialization()));
+        content.add(createDetailRow("Total Patients", String.valueOf(patients.size())));
+        
+        content.add(Box.createVerticalStrut(20));
+        
+        // Assigned Patients
+        content.add(createSectionHeader("Assigned Patients"));
         if (patients.isEmpty()) {
-            details.append("No patients currently assigned.\n");
+             JLabel lblFree = new JLabel("No active patients assigned.");
+             lblFree.setFont(new Font("Segoe UI", Font.ITALIC, 13));
+             lblFree.setForeground(Color.GRAY);
+             content.add(lblFree);
         } else {
-            for (int i = 0; i < patients.size(); i++) {
-                Patient p = patients.get(i);
-                details.append(String.format("%d. %s (%s)\n", i+1, p.getName(), p.getPatientId()));
-                details.append("   Diagnosis: ").append(p.getMedicalHistory()).append("\n");
-                if (p.getRoom() != null) {
-                    details.append("   Room: ").append(p.getRoom().getRoomId()).append("\n");
-                }
-                details.append("\n");
-            }
+             for (Patient p : patients) {
+                 JPanel pRow = new JPanel(new BorderLayout());
+                 pRow.setBackground(new Color(248, 249, 250));
+                 pRow.setBorder(new EmptyBorder(8, 10, 8, 10));
+                 pRow.setMaximumSize(new Dimension(1000, 40));
+                 pRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+                 
+                 JLabel name = new JLabel(p.getName());
+                 name.setFont(new Font("Segoe UI", Font.BOLD, 13));
+                 
+                 JLabel sub = new JLabel("ID: " + p.getPatientId() + " • " + (p.getRoom()!=null ? p.getRoom().getRoomId() : "No Room"));
+                 sub.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+                 sub.setForeground(Color.GRAY);
+                 
+                 JPanel text = new JPanel(new GridLayout(2, 1));
+                 text.setBackground(new Color(248, 249, 250));
+                 text.add(name); text.add(sub);
+                 
+                 pRow.add(text, BorderLayout.CENTER);
+                 content.add(pRow);
+                 content.add(Box.createVerticalStrut(5));
+             }
         }
+
+        JScrollPane scroll = new JScrollPane(content);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        cardPanel.add(scroll, BorderLayout.CENTER);
         
-        JTextArea textArea = new JTextArea(details.toString());
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
-        textArea.setEditable(false);
-        textArea.setBackground(new Color(250, 250, 250));
-        textArea.setBorder(new EmptyBorder(10, 10, 10, 10));
+        // 3. Footer
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setBackground(new Color(245, 245, 245));
+        footer.setBorder(new EmptyBorder(10, 20, 10, 20));
+        JButton btnClose = new JButton("Close");
+        btnClose.addActionListener(e -> javax.swing.SwingUtilities.getWindowAncestor(btnClose).dispose());
+        footer.add(btnClose);
         
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(500, 400));
-        
-        JOptionPane.showMessageDialog(this, scrollPane, 
-            "Doctor Details - Dr. " + d.getName(), JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, cardPanel, "Doctor Details", JOptionPane.PLAIN_MESSAGE);
+    }
+    
+    // UI Helpers (Duplicated for containment)
+    private JLabel createSectionHeader(String title) {
+        JLabel lbl = new JLabel(title);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lbl.setForeground(new Color(13, 110, 253));
+        lbl.setBorder(new EmptyBorder(0, 0, 10, 0));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return lbl;
+    }
+    
+    private JPanel createDetailRow(String label, String value) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 25));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel l = new JLabel(label + ": ");
+        l.setFont(new Font("Segoe UI", Font.BOLD, 13)); l.setForeground(Color.GRAY); l.setPreferredSize(new Dimension(100, 25));
+        JLabel v = new JLabel(value);
+        v.setFont(new Font("Segoe UI", Font.PLAIN, 13)); v.setForeground(new Color(50, 50, 50));
+        p.add(l, BorderLayout.WEST); p.add(v, BorderLayout.CENTER);
+        return p;
     }
 }
