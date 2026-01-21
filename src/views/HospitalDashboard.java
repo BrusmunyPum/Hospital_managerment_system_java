@@ -38,6 +38,7 @@ public class HospitalDashboard extends JFrame {
     private DoctorPanel doctorPanel;
     private RoomPanel roomPanel;
     private UserManagementPanel userMgmtPanel;
+    private BookingManagementPanel bookingPanel; // NEW
     private HistoryPanel historyPanel;
 
     // Track active button
@@ -72,6 +73,8 @@ public class HospitalDashboard extends JFrame {
         if (isAdmin) {
             userMgmtPanel = new UserManagementPanel();
         }
+        // NEW: Booking Panel (Visible to Admin, Doctor, Staff)
+        bookingPanel = new BookingManagementPanel();
         historyPanel = new HistoryPanel(hmc);
 
         // =======================================================
@@ -99,9 +102,12 @@ public class HospitalDashboard extends JFrame {
         menuContainer.setBorder(new EmptyBorder(20, 10, 10, 10));
 
         btnHome = createMenuButton("Home");
+        JButton btnBookings = createMenuButton("Booking Requests"); // NEW
         JButton btnPatients = createMenuButton("Patients");
         
         menuContainer.add(btnHome);
+        menuContainer.add(Box.createVerticalStrut(15));
+        menuContainer.add(btnBookings); // NEW
         menuContainer.add(Box.createVerticalStrut(15));
         menuContainer.add(btnPatients);
         
@@ -206,6 +212,7 @@ public class HospitalDashboard extends JFrame {
         if (isAdmin) {
             contentPanel.add(userMgmtPanel, "Users");
         }
+        contentPanel.add(bookingPanel, "Bookings"); // NEW
         contentPanel.add(historyPanel, "History");
 
         mainContainer.add(contentPanel, BorderLayout.CENTER);
@@ -250,6 +257,15 @@ public class HospitalDashboard extends JFrame {
             JButton finalBtnUsers = btnUsers;
             btnUsers.addActionListener(e -> {
                 switchTab("Users", "User Settings", finalBtnUsers);
+            });
+        }
+        
+        // --- NEW: Booking Listener ---
+        if (bookingPanel != null && btnBookings != null) {
+            JButton finalBtnBookings = btnBookings;
+            btnBookings.addActionListener(e -> {
+                switchTab("Bookings", "Booking Management", finalBtnBookings);
+                // Optional: bookingPanel.refreshTable() if I exposed it
             });
         }
 

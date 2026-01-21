@@ -1,44 +1,99 @@
 -- =============================================
--- STEP 1: DROP OLD TABLES (Clean Slate)
+-- COMPLETE DATABASE RE-CREATION SCRIPT
 -- =============================================
+-- CAUTION: This script DELETES ALL EXISTING DATA.
+-- Run this in your SQL Query tool (pgAdmin or similar).
+
+-- 1. Drop Tables (Order Matters due to Foreign Keys)
+DROP TABLE IF EXISTS bookings CASCADE;
 DROP TABLE IF EXISTS patients CASCADE;
 DROP TABLE IF EXISTS doctors CASCADE;
 DROP TABLE IF EXISTS rooms CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- 1. Create Users Table
+-- 2. Create Users Table (For Login)
 CREATE TABLE users (
     username VARCHAR(50) PRIMARY KEY,
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL,
-    linked_id VARCHAR(50)
+    role VARCHAR(20) NOT NULL, -- ADMIN, DOCTOR, RECEPTIONIST
+    linked_id VARCHAR(50)      -- Links to doctor_id if applicable
 );
--- 2. Create Doctors Table
+
+-- 3. Create Doctors Table
 CREATE TABLE doctors (
     doctor_id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    specialization VARCHAR(100)
+    specialization VARCHAR(100),
+    contact VARCHAR(50)
 );
--- 3. Create Rooms Table
+
+-- 4. Create Rooms Table
 CREATE TABLE rooms (
     room_id VARCHAR(20) PRIMARY KEY,
-    room_type VARCHAR(50) NOT NULL,
+    room_type VARCHAR(50) NOT NULL, -- ICU, Ward, Private
     price DECIMAL(10, 2) DEFAULT 100.00
 );
--- 4. Create Patients Table
+
+-- 5. Create Patients Table
 CREATE TABLE patients (
     patient_id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     age INT,
+    gender VARCHAR(10),
     address VARCHAR(255),
     medical_history TEXT,
     admission_date DATE,
     room_id VARCHAR(20),
     doctor_id VARCHAR(50),
-    FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE SET NULL,
-    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE SET NULL
+    -- Foreign Keys
+    CONSTRAINT fk_patient_doctor FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE SET NULL,
+    CONSTRAINT fk_patient_room FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE SET NULL
 );
--- 5. Insert Default Admin User
+
+-- 6. Create Bookings Table (For Guest Appointments)
+CREATE TABLE bookings (
+    booking_id SERIAL PRIMARY KEY,
+    patient_name VARCHAR(100) NOT NULL,
+    age INT,
+    gender VARCHAR(10),
+    contact_number VARCHAR(20),
+    symptoms TEXT,
+    doctor_id VARCHAR(50),
+    room_id VARCHAR(20),
+    status VARCHAR(20) DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED
+    booking_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Foreign Keys
+    CONSTRAINT fk_booking_doctor FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id) ON DELETE SET NULL,
+    CONSTRAINT fk_booking_room FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE SET NULL
+);
+
+-- =============================================
+-- INITIAL DATA SEEDING
+-- =============================================
+
+-- Default Admin User
 INSERT INTO users (username, password, role, linked_id) 
 VALUES ('admin', 'admin123', 'ADMIN', NULL);
 
+-- Sample Doctors
+INSERT INTO doctors (doctor_id, name, specialization) VALUES 
+('DOC001', 'Smith', 'Cardiology'),
+('DOC002', 'Emily', 'Pediatrics'),
+('DOC003', 'John', 'Neurology');
+
+-- Sample Rooms
+INSERT INTO rooms (room_id, room_type, price) VALUES 
+('101', 'General Ward', 50.00),
+('201', 'Private Room', 150.00),
+('301', 'ICU', 500.00);
+
+-- Sample Patient
+INSERT INTO patients (patient_id, name, age, gender, address, admission_date) VALUES
+('P001', 'John Doe', 30, 'Male', '123 Main St', '2023-01-01');
+
+-- Sample User for Doctor (Optional)
+INSERT INTO users (username, password, role, linked_id)
+VALUES ('doc1', 'doc123', 'DOCTOR', 'DOC001');
+
+-- Done!
+SELECT 'Database Re-created Successfully' as Status;
