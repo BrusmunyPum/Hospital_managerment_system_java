@@ -21,4 +21,5 @@ public class User {
     public boolean isAdmin() { return "ADMIN".equalsIgnoreCase(role); }
     public boolean isDoctor() { return "DOCTOR".equalsIgnoreCase(role); }
     public boolean isStaff() { return "STAFF".equalsIgnoreCase(role); }
+    public boolean isPatient() { return "PATIENT".equalsIgnoreCase(role); }
 }

@@ -56,7 +56,7 @@ public class HistoryPanel extends JPanel {
         topContainer.add(Box.createVerticalStrut(20));
 
         // Toolbar
-        JPanel toolbar = new JPanel(new BorderLayout());
+        toolbar = new JPanel(new BorderLayout());
         toolbar.setOpaque(false);
         
         txtSearch = ModernUI.createSearchField(" Search history...");
@@ -288,8 +288,43 @@ public class HistoryPanel extends JPanel {
         }
     }
     
+    private String patientFilterId = null; // Filter for Patient View
+    private JPanel toolbar; // Reference to toolbar to hide elements if needed
+
+    // ... (Existing Constructor code not shown here, assuming it maps to class structure) ...
+
     public void loadData() {
+        patientFilterId = null; // Reset filter
         refreshTable(); 
+    }
+
+    public void loadDataForPatient(String patientId) {
+        this.patientFilterId = patientId;
+        refreshTable();
+        
+        // Hide Admin controls for Patient View
+        if (toolbar != null) {
+            toolbar.setVisible(false); // Hide the whole toolbar (search/reset) for patients, or customize
+        }
+    }
+    
+    // Allow hiding specific buttons
+    public void setReadOnly(boolean readOnly) {
+         if (toolbar != null) {
+             for (Component c : toolbar.getComponents()) {
+                 if (c instanceof JPanel) { // Right box with buttons
+                     JPanel rightBox = (JPanel) c;
+                     for (Component btn : rightBox.getComponents()) {
+                         if (btn instanceof JButton) {
+                             String text = ((JButton) btn).getText();
+                             if (text.contains("Reset") || text.contains("Refresh")) {
+                                 btn.setVisible(!readOnly);
+                             }
+                         }
+                     }
+                 }
+             }
+         }
     }
 
     private java.util.List<PatientHistory> historyList = new java.util.ArrayList<>();
@@ -298,7 +333,11 @@ public class HistoryPanel extends JPanel {
         tableModel.setRowCount(0);
         SwingWorker<List<PatientHistory>, Void> worker = new SwingWorker<>() {
             @Override protected List<PatientHistory> doInBackground() {
-                return hmc.getPatientCtrl().getPatientHistory();
+                if (patientFilterId != null) {
+                    return hmc.getPatientCtrl().getPatientHistoryByPatientId(patientFilterId);
+                } else {
+                    return hmc.getPatientCtrl().getPatientHistory();
+                }
             }
             @Override protected void done() {
                 try {

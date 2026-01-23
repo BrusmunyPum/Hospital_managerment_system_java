@@ -197,7 +197,7 @@ public class UserManagementPanel extends JPanel {
 
     private void showRoleFilterMenu(JButton source) {
         JPopupMenu menu = new JPopupMenu();
-        String[] roles = {"All Roles", "ADMIN", "DOCTOR", "STAFF"};
+        String[] roles = {"All Roles", "ADMIN", "DOCTOR", "STAFF", "PATIENT"};
         for (String role : roles) {
             JMenuItem item = new JMenuItem(role);
             item.addActionListener(e -> filterByRole(role));
@@ -378,6 +378,10 @@ public class UserManagementPanel extends JPanel {
                 bg = new Color(240, 230, 255);
                 fg = new Color(111, 66, 193);
                 icon = IconUtils.createIcon(IconUtils.ICON_DOCTOR, 14, fg);
+            } else if (role.equalsIgnoreCase("PATIENT")) {
+                bg = new Color(255, 243, 205); // Light Yellow
+                fg = new Color(133, 100, 4);   // Dark Yellow/Brown
+                icon = IconUtils.createIcon(IconUtils.ICON_PATIENT_GROUP, 14, fg);
             } else { // STAFF
                 bg = new Color(225, 255, 235);
                 fg = new Color(25, 135, 84);
@@ -575,7 +579,7 @@ public class UserManagementPanel extends JPanel {
         JPasswordField passField = new JPasswordField();
         JPasswordField confirmPassField = new JPasswordField();
         
-        String[] roles = {"ADMIN", "DOCTOR", "STAFF"};
+        String[] roles = {"ADMIN", "DOCTOR", "STAFF", "PATIENT"};
         JComboBox<String> roleBox = new JComboBox<>(roles);
         roleBox.setSelectedIndex(2); // Default to STAFF
         
@@ -645,7 +649,7 @@ public class UserManagementPanel extends JPanel {
         userField.setEditable(false);
         userField.setBackground(new Color(240, 240, 240));
         
-        String[] roles = {"ADMIN", "DOCTOR", "STAFF"};
+        String[] roles = {"ADMIN", "DOCTOR", "STAFF", "PATIENT"};
         JComboBox<String> roleBox = new JComboBox<>(roles);
         roleBox.setSelectedItem(user.getRole().toUpperCase());
         

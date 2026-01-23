@@ -106,18 +106,21 @@ public class HospitalDashboard extends JFrame {
         JButton btnPatients = createMenuButton("Patients");
         
         menuContainer.add(btnHome);
-        menuContainer.add(Box.createVerticalStrut(15));
-        menuContainer.add(btnBookings); // NEW
-        menuContainer.add(Box.createVerticalStrut(15));
-        menuContainer.add(btnPatients);
+        
+        if (!user.isPatient()) {
+             menuContainer.add(Box.createVerticalStrut(15));
+             menuContainer.add(btnBookings); // NEW
+             menuContainer.add(Box.createVerticalStrut(15));
+             menuContainer.add(btnPatients);
+        }
         
         menuContainer.add(Box.createVerticalStrut(15));
-        JButton btnHistory = createMenuButton("History");
+        JButton btnHistory = createMenuButton(user.isPatient() ? "My History" : "History"); // Rename for Patient
         menuContainer.add(btnHistory);
 
         JButton btnDoctors = null;
         JButton btnRooms = null;
-        if (!isDoctor) {
+        if (!isDoctor && !user.isPatient()) {
             menuContainer.add(Box.createVerticalStrut(15));
             btnDoctors = createMenuButton("Doctors");
             menuContainer.add(btnDoctors);
@@ -233,8 +236,14 @@ public class HospitalDashboard extends JFrame {
         });
 
         btnHistory.addActionListener(e -> {
-            switchTab("History", "Patient Discharge History", btnHistory);
-            historyPanel.loadData();
+            switchTab("History", user.isPatient() ? "My Medical History" : "Patient Discharge History", btnHistory);
+            if (user.isPatient()) {
+                historyPanel.loadDataForPatient(user.getLinkedId());
+                historyPanel.setReadOnly(true); // Hide buttons
+            } else {
+                historyPanel.loadData();
+                historyPanel.setReadOnly(false);
+            }
         });
 
         if (btnDoctors != null) {
