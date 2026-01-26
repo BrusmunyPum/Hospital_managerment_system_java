@@ -56,7 +56,7 @@ public class HistoryPanel extends JPanel {
         topContainer.add(Box.createVerticalStrut(20));
 
         // Toolbar
-        JPanel toolbar = new JPanel(new BorderLayout());
+        toolbar = new JPanel(new BorderLayout());
         toolbar.setOpaque(false);
         
         txtSearch = ModernUI.createSearchField(" Search history...");
@@ -120,6 +120,114 @@ public class HistoryPanel extends JPanel {
         for (int i = 1; i < table.getColumnCount(); i++) {
              table.getColumnModel().getColumn(i).setCellRenderer(ModernUI.createCenterRenderer());
         }
+
+        // Add Context Menu
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    JPopupMenu menu = new JPopupMenu();
+                    JMenuItem viewItem = new JMenuItem("View Record Details");
+                    viewItem.addActionListener(ev -> showHistoryDetailsDialog());
+                    menu.add(viewItem);
+                    menu.show(e.getComponent(), e.getX(), e.getY());
+                }
+            }
+        });
+    }
+
+    private void showHistoryDetailsDialog() {
+        int row = table.getSelectedRow();
+        if (row == -1) {
+             JOptionPane.showMessageDialog(this, "Please select a record first.");
+             return;
+        }
+        
+        // Safe check for index
+        if (row >= historyList.size()) return;
+        
+        PatientHistory h = historyList.get(row);
+        
+        // === Main Card Panel ===
+        JPanel cardPanel = new JPanel(new BorderLayout());
+        cardPanel.setBackground(Color.WHITE);
+        cardPanel.setPreferredSize(new Dimension(500, 600));
+        cardPanel.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230), 1));
+        
+        // 1. Header
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(new Color(13, 110, 253)); // Blue header
+        header.setBorder(new EmptyBorder(20, 25, 20, 25));
+        
+        JLabel lblTitle = new JLabel("Medical Record");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        lblTitle.setForeground(Color.WHITE);
+        
+        JLabel lblSubtitle = new JLabel(h.getName());
+        lblSubtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblSubtitle.setForeground(new Color(224, 247, 250));
+        
+        header.add(lblTitle, BorderLayout.NORTH);
+        header.add(lblSubtitle, BorderLayout.SOUTH);
+        cardPanel.add(header, BorderLayout.NORTH);
+        
+        // 2. Content
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(Color.WHITE);
+        content.setBorder(new EmptyBorder(20, 25, 20, 25));
+        
+        // Patient Info
+        content.add(createSectionHeader("Patient Information"));
+        content.add(createDetailRow("Name", h.getName()));
+        content.add(createDetailRow("Patient ID", h.getPatientId()));
+        content.add(createDetailRow("Age", String.valueOf(h.getAge())));
+        content.add(createDetailRow("Address", h.getAddress()));
+        
+        content.add(Box.createVerticalStrut(20));
+        
+        // Medical Record
+        content.add(createSectionHeader("Hospital Stay Details"));
+        content.add(createDetailRow("Diagnosis", h.getMedicalHistory()));
+        content.add(createDetailRow("Attending Doctor", h.getDoctorName() != null ? h.getDoctorName() : "Unknown"));
+        content.add(createDetailRow("Admitted", h.getAdmissionDate()));
+        content.add(createDetailRow("Discharged", h.getDischargeDate()));
+
+        JScrollPane scroll = new JScrollPane(content);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        cardPanel.add(scroll, BorderLayout.CENTER);
+        
+        // 3. Footer
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setBackground(new Color(245, 245, 245));
+        footer.setBorder(new EmptyBorder(10, 20, 10, 20));
+        JButton btnClose = new JButton("Close");
+        btnClose.addActionListener(e -> javax.swing.SwingUtilities.getWindowAncestor(btnClose).dispose());
+        footer.add(btnClose);
+        
+        JOptionPane.showMessageDialog(this, cardPanel, "Record Details", JOptionPane.PLAIN_MESSAGE);
+    }
+
+    private JLabel createSectionHeader(String title) {
+        JLabel lbl = new JLabel(title);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lbl.setForeground(new Color(13, 110, 253));
+        lbl.setBorder(new EmptyBorder(0, 0, 10, 0));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return lbl;
+    }
+    
+    private JPanel createDetailRow(String label, String value) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 25));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel l = new JLabel(label + ": ");
+        l.setFont(new Font("Segoe UI", Font.BOLD, 13)); l.setForeground(Color.GRAY); l.setPreferredSize(new Dimension(130, 25));
+        JLabel v = new JLabel(value);
+        v.setFont(new Font("Segoe UI", Font.PLAIN, 13)); v.setForeground(new Color(50, 50, 50));
+        p.add(l, BorderLayout.WEST); p.add(v, BorderLayout.CENTER);
+        return p;
     }
     
     // --- CUSTOM RENDERER: Patient Info (Avatar + Name/ID) ---
@@ -180,20 +288,61 @@ public class HistoryPanel extends JPanel {
         }
     }
     
+    private String patientFilterId = null; // Filter for Patient View
+    private JPanel toolbar; // Reference to toolbar to hide elements if needed
+
+    // ... (Existing Constructor code not shown here, assuming it maps to class structure) ...
+
     public void loadData() {
+        patientFilterId = null; // Reset filter
         refreshTable(); 
     }
+
+    public void loadDataForPatient(String patientId) {
+        this.patientFilterId = patientId;
+        refreshTable();
+        
+        // Hide Admin controls for Patient View
+        if (toolbar != null) {
+            toolbar.setVisible(false); // Hide the whole toolbar (search/reset) for patients, or customize
+        }
+    }
+    
+    // Allow hiding specific buttons
+    public void setReadOnly(boolean readOnly) {
+         if (toolbar != null) {
+             for (Component c : toolbar.getComponents()) {
+                 if (c instanceof JPanel) { // Right box with buttons
+                     JPanel rightBox = (JPanel) c;
+                     for (Component btn : rightBox.getComponents()) {
+                         if (btn instanceof JButton) {
+                             String text = ((JButton) btn).getText();
+                             if (text.contains("Reset") || text.contains("Refresh")) {
+                                 btn.setVisible(!readOnly);
+                             }
+                         }
+                     }
+                 }
+             }
+         }
+    }
+
+    private java.util.List<PatientHistory> historyList = new java.util.ArrayList<>();
 
     private void refreshTable() {
         tableModel.setRowCount(0);
         SwingWorker<List<PatientHistory>, Void> worker = new SwingWorker<>() {
             @Override protected List<PatientHistory> doInBackground() {
-                return hmc.getPatientCtrl().getPatientHistory();
+                if (patientFilterId != null) {
+                    return hmc.getPatientCtrl().getPatientHistoryByPatientId(patientFilterId);
+                } else {
+                    return hmc.getPatientCtrl().getPatientHistory();
+                }
             }
             @Override protected void done() {
                 try {
-                    List<PatientHistory> list = get();
-                    for (PatientHistory p : list) {
+                    historyList = get();
+                    for (PatientHistory p : historyList) {
                         tableModel.addRow(new Object[]{
                             p.getName() + " (" + p.getPatientId() + ")",
                             p.getMedicalHistory(),

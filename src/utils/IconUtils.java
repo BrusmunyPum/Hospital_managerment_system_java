@@ -28,6 +28,8 @@ public class IconUtils {
     public static final String ICON_REFRESH = "REFRESH";
     public static final String ICON_ADMIN = "ADMIN";
     public static final String ICON_STAFF = "STAFF";
+    public static final String ICON_CHECK = "CHECK"; 
+    public static final String ICON_LOCK = "LOCK"; // Added Lock Icon
 
     public static Icon createIcon(String type, int size, Color color) {
         BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
@@ -68,6 +70,8 @@ public class IconUtils {
                 case ICON_ADMIN: drawAdmin(g2); break;
                 case ICON_STAFF: drawStaff(g2); break;
                 case ICON_LINK: drawLink(g2); break;
+                case ICON_CHECK: drawCheck(g2); break;
+                case ICON_LOCK: drawLock(g2); break; // Added Lock
                 default: drawHelp(g2); break; // Fallback
             }
         } finally {
@@ -373,6 +377,33 @@ public class IconUtils {
         
         // Link 2 (Right/Bottom) - Draw slightly offset
         g2.drawRoundRect(45, 35, 35, 30, 20, 20);
+    }
+
+    private static void drawCheck(Graphics2D g2) {
+        g2.setStroke(new BasicStroke(10, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        
+        // Simple Checkmark
+        // Start (20, 50) -> Mid (45, 75) -> End (85, 25)
+        Path2D p = new Path2D.Double();
+        p.moveTo(20, 50);
+        p.lineTo(45, 75);
+        p.lineTo(85, 25);
+        
+        g2.draw(p);
+    }
+    
+    private static void drawLock(Graphics2D g2) {
+        // Body
+        g2.fillRect(30, 45, 40, 35);
+        
+        // Shackle
+        g2.setStroke(new BasicStroke(6));
+        g2.drawArc(30, 15, 40, 40, 0, 180);
+        
+        // Keyhole
+        g2.setColor(Color.WHITE);
+        g2.fillOval(48, 55, 4, 6);
+        g2.drawLine(50, 60, 50, 70);
     }
     
     // --- Helper for Avatars ---

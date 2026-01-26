@@ -10,11 +10,12 @@ import java.util.List;
 public class RoomController {
 
     public boolean addRoom(Room room) {
-        String sql = "INSERT INTO rooms (room_id, room_type) VALUES (?, ?)";
+        String sql = "INSERT INTO rooms (room_id, room_type, price) VALUES (?, ?, ?)";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, room.getRoomId());
             pstmt.setString(2, room.getRoomType());
+            pstmt.setDouble(3, room.getPrice());
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -23,11 +24,12 @@ public class RoomController {
     }
 
     public boolean updateRoom(Room room) {
-        String sql = "UPDATE rooms SET room_type=? WHERE room_id=?";
+        String sql = "UPDATE rooms SET room_type=?, price=? WHERE room_id=?";
         try (Connection conn = dbConnecting.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, room.getRoomType());
-            pstmt.setString(2, room.getRoomId());
+            pstmt.setDouble(2, room.getPrice());
+            pstmt.setString(3, room.getRoomId());
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -84,7 +86,10 @@ public class RoomController {
                 String roomId = rs.getString("room_id");
                 Room r = roomMap.computeIfAbsent(roomId, k -> {
                     try {
-                        return new Room(k, rs.getString("room_type"));
+                        double price = 0;
+                        try { price = rs.getDouble("price"); } catch(SQLException e) {}
+                        if (price > 0) return new Room(k, rs.getString("room_type"), price);
+                        else return new Room(k, rs.getString("room_type"));
                     } catch (SQLException e) { return null; }
                 });
                 
@@ -112,7 +117,12 @@ public class RoomController {
             pstmt.setString(1, roomId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                Room r = new Room(rs.getString("room_id"), rs.getString("room_type"));
+                Room r;
+                double price = 0;
+                try { price = rs.getDouble("price"); } catch(SQLException e) {}
+                if (price > 0) r = new Room(rs.getString("room_id"), rs.getString("room_type"), price);
+                else r = new Room(rs.getString("room_id"), rs.getString("room_type"));
+                
                 String pid = rs.getString("patient_id");
                 if (pid != null) {
                     Patient p = new Patient(pid, rs.getString("patient_name"), 0, "", "");
@@ -139,7 +149,10 @@ public class RoomController {
                 // Using computeIfAbsent to ensure unique Room objects
                 Room r = roomMap.computeIfAbsent(roomId, k -> {
                     try {
-                        return new Room(k, rs.getString("room_type"));
+                        double price = 0;
+                        try { price = rs.getDouble("price"); } catch(SQLException e) {}
+                        if (price > 0) return new Room(k, rs.getString("room_type"), price);
+                        else return new Room(k, rs.getString("room_type"));
                     } catch (SQLException e) { return null; }
                 });
 
@@ -167,7 +180,10 @@ public class RoomController {
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                available.add(new Room(rs.getString("room_id"), rs.getString("room_type")));
+                double price = 0;
+                try { price = rs.getDouble("price"); } catch(SQLException e) {}
+                if (price > 0) available.add(new Room(rs.getString("room_id"), rs.getString("room_type"), price));
+                else available.add(new Room(rs.getString("room_id"), rs.getString("room_type")));
             }
         } catch (SQLException e) {
             e.printStackTrace();

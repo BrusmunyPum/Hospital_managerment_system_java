@@ -194,6 +194,31 @@ public class PatientController {
         }
         return list;
     }
+
+    public List<models.PatientHistory> getPatientHistoryByPatientId(String patientId) {
+        List<models.PatientHistory> list = new ArrayList<>();
+        String sql = "SELECT * FROM patient_history WHERE patient_id = ? ORDER BY discharge_date DESC";
+        try (Connection conn = dbConnecting.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, patientId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                list.add(new models.PatientHistory(
+                    rs.getString("patient_id"),
+                    rs.getString("name"),
+                    rs.getInt("age"),
+                    rs.getString("address"),
+                    rs.getString("medical_history"),
+                    rs.getString("doctor_name"),
+                    rs.getString("admission_date"),
+                    rs.getString("discharge_date")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
     
     // --- FIND SINGLE PATIENT ---
     public Patient findPatientById(String patientId) {

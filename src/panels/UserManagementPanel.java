@@ -5,6 +5,7 @@ import models.User;
 
 import utils.IconUtils;
 import utils.ModernUI;
+import utils.DialogUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -196,7 +197,7 @@ public class UserManagementPanel extends JPanel {
 
     private void showRoleFilterMenu(JButton source) {
         JPopupMenu menu = new JPopupMenu();
-        String[] roles = {"All Roles", "ADMIN", "DOCTOR", "STAFF"};
+        String[] roles = {"All Roles", "ADMIN", "DOCTOR", "STAFF", "PATIENT"};
         for (String role : roles) {
             JMenuItem item = new JMenuItem(role);
             item.addActionListener(e -> filterByRole(role));
@@ -377,6 +378,10 @@ public class UserManagementPanel extends JPanel {
                 bg = new Color(240, 230, 255);
                 fg = new Color(111, 66, 193);
                 icon = IconUtils.createIcon(IconUtils.ICON_DOCTOR, 14, fg);
+            } else if (role.equalsIgnoreCase("PATIENT")) {
+                bg = new Color(255, 243, 205); // Light Yellow
+                fg = new Color(133, 100, 4);   // Dark Yellow/Brown
+                icon = IconUtils.createIcon(IconUtils.ICON_PATIENT_GROUP, 14, fg);
             } else { // STAFF
                 bg = new Color(225, 255, 235);
                 fg = new Color(25, 135, 84);
@@ -551,10 +556,10 @@ public class UserManagementPanel extends JPanel {
 
     private void showContextMenu(MouseEvent e) {
         JPopupMenu menu = new JPopupMenu();
-        JMenuItem viewItem = new JMenuItem("👁️ View Details");
-        JMenuItem editItem = new JMenuItem("✏️ Edit User");
-        JMenuItem resetItem = new JMenuItem("🔑 Reset Password");
-        JMenuItem deleteItem = new JMenuItem("🗑️ Delete User");
+        JMenuItem viewItem = new JMenuItem("View Details");
+        JMenuItem editItem = new JMenuItem("Edit User");
+        JMenuItem resetItem = new JMenuItem("Reset Password");
+        JMenuItem deleteItem = new JMenuItem("Delete User");
         
         viewItem.addActionListener(ev -> showUserDetailsDialog());
         editItem.addActionListener(ev -> showEditUserDialog());
@@ -574,25 +579,20 @@ public class UserManagementPanel extends JPanel {
         JPasswordField passField = new JPasswordField();
         JPasswordField confirmPassField = new JPasswordField();
         
-        String[] roles = {"ADMIN", "DOCTOR", "STAFF"};
+        String[] roles = {"ADMIN", "DOCTOR", "STAFF", "PATIENT"};
         JComboBox<String> roleBox = new JComboBox<>(roles);
         roleBox.setSelectedIndex(2); // Default to STAFF
         
         JTextField linkField = new JTextField();
         
-        JPanel panel = new JPanel(new GridLayout(6, 2, 10, 10));
-        panel.add(new JLabel("Username:"));
-        panel.add(userField);
-        panel.add(new JLabel("Password:"));
-        panel.add(passField);
-        panel.add(new JLabel("Confirm Password:"));
-        panel.add(confirmPassField);
-        panel.add(new JLabel("Role:"));
-        panel.add(roleBox);
-        panel.add(new JLabel("Linked ID (Optional):"));
-        panel.add(linkField);
-        panel.add(new JLabel("(e.g., DOC-001 for Doctor)"));
-        panel.add(new JLabel(""));
+        JPanel panel = DialogUtils.createForm("Create New User",
+            "Username:", userField,
+            "Password:", passField,
+            "Confirm Password:", confirmPassField,
+            "Role:", roleBox,
+            "Linked ID (Optional):", linkField,
+            "", new JLabel("(e.g., DOC-001 for Doctor)")
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Create New User", 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
@@ -627,7 +627,7 @@ public class UserManagementPanel extends JPanel {
             // Create user
             if (userCtrl.createUser(username, password, role, linkedId)) {
                 JOptionPane.showMessageDialog(this, 
-                    "✅ User created successfully!\n\nUsername: " + username + "\nRole: " + role,
+                    "User created successfully!\n\nUsername: " + username + "\nRole: " + role,
                     "Success", JOptionPane.INFORMATION_MESSAGE);
                 refreshTable();
             } else {
@@ -649,21 +649,18 @@ public class UserManagementPanel extends JPanel {
         userField.setEditable(false);
         userField.setBackground(new Color(240, 240, 240));
         
-        String[] roles = {"ADMIN", "DOCTOR", "STAFF"};
+        String[] roles = {"ADMIN", "DOCTOR", "STAFF", "PATIENT"};
         JComboBox<String> roleBox = new JComboBox<>(roles);
         roleBox.setSelectedItem(user.getRole().toUpperCase());
         
         JTextField linkField = new JTextField(user.getLinkedId() != null ? user.getLinkedId() : "");
         
-        JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
-        panel.add(new JLabel("Username (Cannot Change):"));
-        panel.add(userField);
-        panel.add(new JLabel("Role:"));
-        panel.add(roleBox);
-        panel.add(new JLabel("Linked ID:"));
-        panel.add(linkField);
-        panel.add(new JLabel("(Leave blank to unlink)"));
-        panel.add(new JLabel(""));
+        JPanel panel = DialogUtils.createForm("Edit User",
+            "Username (Cannot Change):", userField,
+            "Role:", roleBox,
+            "Linked ID:", linkField,
+            "", new JLabel("(Leave blank to unlink)")
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Edit User: " + username, 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
@@ -687,13 +684,11 @@ public class UserManagementPanel extends JPanel {
         JPasswordField newPassField = new JPasswordField();
         JPasswordField confirmPassField = new JPasswordField();
         
-        JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
-        panel.add(new JLabel("User:"));
-        panel.add(new JLabel(username));
-        panel.add(new JLabel("New Password:"));
-        panel.add(newPassField);
-        panel.add(new JLabel("Confirm Password:"));
-        panel.add(confirmPassField);
+        JPanel panel = DialogUtils.createForm("Reset Password",
+            "User:", new JLabel(username),
+            "New Password:", newPassField,
+            "Confirm Password:", confirmPassField
+        );
         
         if (JOptionPane.showConfirmDialog(this, panel, "Reset Password", 
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
@@ -758,71 +753,146 @@ public class UserManagementPanel extends JPanel {
         
         User user = userCtrl.getUserByUsername(username);
         if (user == null) return;
+
+        // === Main Card Panel ===
+        JPanel cardPanel = new JPanel(new BorderLayout());
+        cardPanel.setBackground(Color.WHITE);
+        cardPanel.setPreferredSize(new Dimension(500, 600));
+        cardPanel.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230), 1));
         
-        StringBuilder details = new StringBuilder();
-        details.append("═══════════════════════════════\n");
-        details.append("       USER DETAILS\n");
-        details.append("═══════════════════════════════\n\n");
-        details.append("Username: ").append(user.getUsername()).append("\n");
-        details.append("Email: ").append(user.getUsername()).append("@hospital.com\n");
-        details.append("Role: ").append(user.getRole().toUpperCase()).append("\n\n");
+        // 1. Header with Gradient-like look
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(new Color(13, 110, 253)); // Blue header
+        header.setBorder(new EmptyBorder(25, 25, 25, 25));
         
-        details.append("───────────────────────────────\n");
-        details.append("ACCESS PERMISSIONS\n");
-        details.append("───────────────────────────────\n\n");
+        JLabel lblTitle = new JLabel("User Profile");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        lblTitle.setForeground(Color.WHITE);
         
+        JLabel lblSubtitle = new JLabel(user.getRole().toUpperCase());
+        lblSubtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblSubtitle.setForeground(new Color(224, 247, 250));
+        
+        header.add(lblTitle, BorderLayout.NORTH);
+        header.add(lblSubtitle, BorderLayout.SOUTH);
+        cardPanel.add(header, BorderLayout.NORTH);
+        
+        // 2. Content Scroll Pane
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(Color.WHITE);
+        content.setBorder(new EmptyBorder(20, 25, 20, 25));
+        
+        // User Info Section
+        content.add(createSectionHeader("Account Information"));
+        content.add(createDetailRow("Username", user.getUsername()));
+        content.add(createDetailRow("Email", user.getUsername() + "@hospital.com"));
+        content.add(createDetailRow("Status", "Active"));
+        content.add(createDetailRow("Last Login", "2 hours ago"));
+        
+        content.add(Box.createVerticalStrut(20));
+        
+        // Permissions Section
+        content.add(createSectionHeader("Access Permissions"));
         String role = user.getRole().toUpperCase();
         if (role.equals("ADMIN")) {
-            details.append("✅ Full System Access\n");
-            details.append("✅ User Management\n");
-            details.append("✅ All Patient Records\n");
-            details.append("✅ Doctor Management\n");
-            details.append("✅ Room Management\n");
-            details.append("✅ Financial Reports\n");
+            content.add(createPermissionItem("Full System Access"));
+            content.add(createPermissionItem("User Management"));
+            content.add(createPermissionItem("All Patient Records"));
+            content.add(createPermissionItem("Doctor Management"));
+            content.add(createPermissionItem("Room Management"));
+            content.add(createPermissionItem("Financial Reports"));
         } else if (role.equals("DOCTOR")) {
-            details.append("✅ Assigned Patient Records\n");
-            details.append("✅ Medical History Access\n");
-            details.append("✅ Prescription Management\n");
-            details.append("❌ User Management\n");
-            details.append("❌ System Configuration\n");
+            content.add(createPermissionItem("Assigned Patient Records"));
+            content.add(createPermissionItem("Medical History Access"));
+            content.add(createPermissionItem("Prescription Management"));
         } else {
-            details.append("✅ Basic Patient Records\n");
-            details.append("✅ Room Management\n");
-            details.append("❌ User Management\n");
-            details.append("❌ Doctor Management\n");
-            details.append("❌ Financial Access\n");
+            content.add(createPermissionItem("Basic Patient Records"));
+            content.add(createPermissionItem("Room Management"));
         }
         
-        details.append("\n───────────────────────────────\n");
-        details.append("LINKED ENTITY\n");
-        details.append("───────────────────────────────\n\n");
+        content.add(Box.createVerticalStrut(20));
         
+        // Linked Entity Section
+        content.add(createSectionHeader("Linked Entity"));
         if (user.getLinkedId() != null && !user.getLinkedId().trim().isEmpty()) {
-            details.append("Linked to: ").append(user.getLinkedId()).append("\n");
+            content.add(createDetailRow("Linked ID", user.getLinkedId()));
             if (role.equals("DOCTOR")) {
-                details.append("Type: Doctor Profile\n");
+               content.add(createDetailRow("Type", "Doctor Profile")); 
             }
         } else {
-            details.append("No linked entity\n");
+            JLabel lblNone = new JLabel("No linked entity record.");
+            lblNone.setFont(new Font("Segoe UI", Font.ITALIC, 13));
+            lblNone.setForeground(Color.GRAY);
+            lblNone.setAlignmentX(Component.LEFT_ALIGNMENT);
+            content.add(lblNone);
         }
+
+        JScrollPane scroll = new JScrollPane(content);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        cardPanel.add(scroll, BorderLayout.CENTER);
         
-        details.append("\n───────────────────────────────\n");
-        details.append("ACCOUNT STATUS\n");
-        details.append("───────────────────────────────\n\n");
-        details.append("Status: Active\n");
-        details.append("Last Login: 2 hours ago\n");
-        details.append("Account Created: Jan 15, 2024\n");
+        // 3. Footer
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setBackground(new Color(245, 245, 245));
+        footer.setBorder(new EmptyBorder(10, 20, 10, 20));
+        JButton btnClose = new JButton("Close");
+        btnClose.setFocusPainted(false);
+        btnClose.addActionListener(e -> javax.swing.SwingUtilities.getWindowAncestor(btnClose).dispose());
+        footer.add(btnClose);
+        // Note: JOptionPane wrapper acts as footer buttons typically, but we can add custom buttons if we display via PLAIN_MESSAGE
         
-        JTextArea textArea = new JTextArea(details.toString());
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
-        textArea.setEditable(false);
-        textArea.setBackground(new Color(250, 250, 250));
-        textArea.setBorder(new EmptyBorder(10, 10, 10, 10));
+        JOptionPane.showMessageDialog(this, cardPanel, "User Details", JOptionPane.PLAIN_MESSAGE);
+    }
+
+    // Helper: Section Headers
+    private JLabel createSectionHeader(String title) {
+        JLabel lbl = new JLabel(title);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lbl.setForeground(new Color(13, 110, 253));
+        lbl.setBorder(new EmptyBorder(0, 0, 10, 0));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return lbl;
+    }
+    
+    // Helper: Detail Row
+    private JPanel createDetailRow(String label, String value) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 25));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
         
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(500, 500));
+        JLabel l = new JLabel(label + ": ");
+        l.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        l.setForeground(Color.GRAY);
+        l.setPreferredSize(new Dimension(100, 25));
         
-        JOptionPane.showMessageDialog(this, scrollPane, 
-            "User Profile - " + username, JOptionPane.INFORMATION_MESSAGE);
+        JLabel v = new JLabel(value);
+        v.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        v.setForeground(new Color(50, 50, 50));
+        
+        p.add(l, BorderLayout.WEST);
+        p.add(v, BorderLayout.CENTER);
+        return p;
+    }
+    
+    // Helper: Permission Item
+    private JPanel createPermissionItem(String text) {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 2));
+        p.setBackground(Color.WHITE);
+        p.setMaximumSize(new Dimension(1000, 25));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        JLabel bullet = new JLabel("•  ");
+        bullet.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        bullet.setForeground(new Color(40, 167, 69)); // Green bullet
+        
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        
+        p.add(bullet);
+        p.add(lbl);
+        return p;
     }
 }
